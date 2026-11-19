@@ -1,0 +1,52 @@
+/* --- Title Bar --- */
+.titlebar {
+    height: 30px;
+    background: #1a1a1a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.titlebar-text {
+    padding-left: 12px;
+    font-size: 13px;
+    color: #a0a0a0;
+    flex-grow: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+/* --- Window Controls --- */
+.titlebar-controls {
+    display: flex;
+    height: 100%;
+}
+
+.titlebar-button {
+    height: 100%;
+    width: 45px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: #a0a0a0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    cursor: default;
+}
+
+.titlebar-button:hover {
+    background: #333;
+    color: white;
+}
+
+.titlebar-button.titlebar-close:hover {
+    background: #e81123;
+    color: white;
+}
