@@ -20,7 +20,7 @@
         const activeTokenData = $configStore.tokens.find(t => t.character_id === $activeCharacterId);
 
         if (activeTokenData && activeTokenData.access_token) {
-            fetchAssets($activeCharacterId, activeTokenData.access_token);
+            fetchAssets($activeCharacterId);
         } else {
             assetsErrorMessage.set("No valid access token found for this character. Please re-authenticate.");
         }

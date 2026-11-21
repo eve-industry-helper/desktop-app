@@ -5,26 +5,53 @@
     overflow: hidden;
 }
 
-/* Left Column */
+/* Column 1 & 2 Sidebars */
 .plans-sidebar {
     width: 260px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background-color: #1a1a1b;
-    border-right: 1px solid #2d2d30;
+    background-color: var(--bg-darker);
+    border-right: 1px solid var(--border-subtle);
     min-height: 0;
+}
+
+.entries-sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background-color: #1e1e1f;
+    border-right: 1px solid var(--border-subtle);
+    min-height: 0;
+}
+
+.entries-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.75rem 0.25rem 0.75rem;
+}
+
+.entries-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .sidebar-top {
     padding: 0.75rem;
-    border-bottom: 1px solid #2d2d30;
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
 }
 
 .add-plan-btn {
     width: 100%;
-    background-color: #0e639c;
+    background-color: var(--btn-primary);
     color: #fff;
     border: none;
     border-radius: 4px;
@@ -35,7 +62,19 @@
 }
 
 .add-plan-btn:hover {
-    background-color: #1177bb;
+    background-color: var(--btn-primary-hover);
+}
+
+.new-plan-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.new-plan-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
 }
 
 .sidebar-list {
@@ -66,12 +105,12 @@
 }
 
 .plan-item:hover {
-    background-color: #252526;
+    background-color: var(--surface);
 }
 
 .plan-item.active {
-    background-color: #2a2d2e;
-    border-color: #007acc;
+    background-color: var(--surface-hover);
+    border-color: var(--primary);
     color: #fff;
 }
 
@@ -85,7 +124,7 @@
 
 .plan-item-count {
     font-size: 0.75rem;
-    color: #9cdcfe;
+    color: var(--accent);
     flex-shrink: 0;
 }
 
@@ -96,7 +135,30 @@
     margin-top: 1.5rem;
 }
 
-/* Right Column */
+.entry-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.entry-badge.fit {
+    background-color: #264f78;
+    color: var(--accent);
+}
+
+.entry-badge.bp {
+    background-color: #1e3a2f;
+    color: #4ec9b0;
+}
+
+.entry-badge.rxn {
+    background-color: #4a3b1e;
+    color: var(--warning);
+}
+
+/* Column 3: Workspace */
 .plan-workspace {
     flex: 1;
     display: flex;
@@ -120,21 +182,45 @@
     margin: 0 0 0.25rem 0;
 }
 
-.subtitle {
-    font-size: 0.85rem;
-    color: #aaa;
-}
-
 .workspace-empty {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #888;
+    color: var(--text-dim);
     font-size: 0.9rem;
 }
 
-/* Paste Form */
+/* Add Entry Form */
+.mode-tabs {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 0.6rem;
+}
+
+.mode-tab {
+    background: transparent;
+    border: 1px solid #333;
+    color: #bbb;
+    border-radius: 4px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.mode-tab:hover {
+    background-color: var(--surface);
+    color: #fff;
+}
+
+.mode-tab.active {
+    background-color: var(--btn-primary);
+    border-color: var(--btn-primary);
+    color: #fff;
+}
+
 .paste-box {
     display: flex;
     flex-direction: column;
@@ -143,8 +229,8 @@
 
 .paste-box textarea {
     width: 100%;
-    background-color: #1e1e1e;
-    color: #e0e0e0;
+    background-color: var(--bg-color);
+    color: var(--text-main);
     border: 1px solid #333;
     border-radius: 6px;
     padding: 0.75rem;
@@ -156,7 +242,7 @@
 
 .paste-box textarea:focus {
     outline: none;
-    border-color: #007acc;
+    border-color: var(--primary);
 }
 
 .paste-actions {
@@ -166,62 +252,25 @@
     gap: 0.65rem;
 }
 
-.error-text {
-    color: #f48771;
-    font-size: 0.85rem;
+.paste-actions .error-text {
     margin-right: auto;
 }
 
-.primary-btn {
-    background-color: #0e639c;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
+.single-form {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
 }
 
-.primary-btn:hover:not(:disabled) {
-    background-color: #1177bb;
+.single-form .field-label {
+    flex: 1;
 }
 
-.primary-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.single-form .runs-field {
+    flex: 0 0 110px;
 }
 
-.secondary-btn {
-    background-color: transparent;
-    color: #ccc;
-    border: 1px solid #444;
-    border-radius: 4px;
-    padding: 0.5rem 0.9rem;
-    font-size: 0.85rem;
-    cursor: pointer;
-}
-
-.secondary-btn:hover {
-    background-color: #2a2d2e;
-}
-
-.remove-btn {
-    background: transparent;
-    border: 1px solid #444;
-    color: #ccc;
-    border-radius: 4px;
-    padding: 0.35rem 0.7rem;
-    font-size: 0.8rem;
-    cursor: pointer;
-}
-
-.remove-btn:hover {
-    border-color: #f48771;
-    color: #f48771;
-}
-
-/* Plan Sections (Blueprints & Buy-Only) */
+/* Blueprints & Buy-Only Sections */
 .plan-sections {
     display: flex;
     flex-direction: column;
@@ -246,18 +295,18 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #9cdcfe;
+    color: var(--accent);
 }
 
 .section-title.buy-title {
-    color: #dcdcaa;
+    color: var(--warning);
 }
 
 .bp-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    background-color: #1e1e1e;
+    background-color: var(--bg-color);
     border: 1px solid #333;
     border-radius: 6px;
 }
@@ -294,7 +343,7 @@
 }
 
 .bp-row.expandable:hover {
-    background-color: #252526;
+    background-color: var(--surface);
 }
 
 .bp-chevron {
@@ -335,13 +384,13 @@
 .bp-runs {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #9cdcfe;
+    color: var(--accent);
 }
 
 .buy-qty {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #dcdcaa;
+    color: var(--warning);
 }
 
 /* Collapsible Material List */
@@ -349,8 +398,8 @@
     list-style: none;
     margin: 0;
     padding: 0.25rem 1rem 0.5rem 3.25rem;
-    background-color: #181819;
-    border-top: 1px solid #252526;
+    background-color: var(--bg-deep);
+    border-top: 1px solid var(--surface);
 }
 
 .material-row {
@@ -379,7 +428,7 @@
 }
 
 .material-qty {
-    color: #9cdcfe;
+    color: var(--accent);
     font-family: monospace;
     font-size: 0.85rem;
 }
@@ -410,141 +459,4 @@
 .sidebar-list::-webkit-scrollbar-thumb:hover,
 .plan-sections::-webkit-scrollbar-thumb:hover {
     background: #55555a;
-}
-
-/* Column 1 inline new-plan form */
-.new-plan-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.new-plan-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.4rem;
-}
-
-.text-input {
-    width: 100%;
-    background-color: #1e1e1e;
-    color: #e0e0e0;
-    border: 1px solid #3c3c3c;
-    border-radius: 4px;
-    padding: 0.45rem 0.6rem;
-    font-size: 0.85rem;
-    box-sizing: border-box;
-}
-
-.text-input:focus {
-    outline: none;
-    border-color: #007acc;
-}
-
-.primary-btn.small,
-.secondary-btn.small,
-.remove-btn.small {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.78rem;
-}
-
-/* Column 2: Entries Sidebar */
-.entries-sidebar {
-    width: 260px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    background-color: #1e1e1f;
-    border-right: 1px solid #2d2d30;
-    min-height: 0;
-}
-
-.entries-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 0.75rem 0.25rem 0.75rem;
-}
-
-.entries-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #fff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.entry-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 0.15rem 0.35rem;
-    border-radius: 3px;
-    flex-shrink: 0;
-}
-
-.entry-badge.fit {
-    background-color: #264f78;
-    color: #9cdcfe;
-}
-
-.entry-badge.bp {
-    background-color: #1e3a2f;
-    color: #4ec9b0;
-}
-
-.entry-badge.rxn {
-    background-color: #4a3b1e;
-    color: #dcdcaa;
-}
-
-/* Mode Tabs (Fit / Blueprint / Reaction) */
-.mode-tabs {
-    display: flex;
-    gap: 0.4rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #2d2d30;
-    padding-bottom: 0.6rem;
-}
-
-.mode-tab {
-    background: transparent;
-    border: 1px solid #333;
-    color: #bbb;
-    border-radius: 4px;
-    padding: 0.4rem 0.85rem;
-    font-size: 0.82rem;
-    cursor: pointer;
-}
-
-.mode-tab:hover {
-    background-color: #252526;
-    color: #fff;
-}
-
-.mode-tab.active {
-    background-color: #0e639c;
-    border-color: #0e639c;
-    color: #fff;
-}
-
-/* Single Blueprint / Reaction Form */
-.single-form {
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-end;
-}
-
-.field-label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    flex: 1;
-    font-size: 0.8rem;
-    color: #bbb;
-}
-
-.runs-field {
-    flex: 0 0 110px;
 }

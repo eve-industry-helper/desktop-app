@@ -1,16 +1,13 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { moduleSubNav } from '$lib/stores/global';
-    import { loadIndustrySettings } from './settings/settings';
+    import type { Snippet } from 'svelte';
+    import { loadIndustrySettings } from '$lib/stores/industrySettings';
 
-    $: moduleSubNav.set([
-        { label: "Plans", href: "/industry/plans" },
-        { label: "Settings", href: "/industry/settings" }
-    ]);
+    let { children }: { children: Snippet } = $props();
 
     onMount(() => {
         loadIndustrySettings();
     });
 </script>
 
-<slot />
+{@render children()}

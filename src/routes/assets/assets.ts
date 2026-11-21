@@ -70,7 +70,7 @@ function buildAssetTree(rawAssets: Asset[], names: Record<number, string>): Loca
     return groups.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function fetchAssets(characterId: number, accessToken: string) {
+export async function fetchAssets(characterId: number) {
     isFetchingAssets.set(true);
     assetsErrorMessage.set("");
     personalAssets.set([]);
@@ -78,8 +78,7 @@ export async function fetchAssets(characterId: number, accessToken: string) {
 
     try {
         const rawAssets: Asset[] = await invoke('get_character_assets', {
-            characterId,
-            accessToken
+            characterId
         });
 
         const MAX_INT32 = 2147483647;
@@ -89,7 +88,6 @@ export async function fetchAssets(characterId: number, accessToken: string) {
 
         const ownedItemIds = new Set<number>(rawAssets.map(item => item.item_id));
 
-        // Smart routing based on location_type
         rawAssets.forEach(item => {
             if (item.type_id) standardIds.add(item.type_id);
 
@@ -114,8 +112,8 @@ export async function fetchAssets(characterId: number, accessToken: string) {
         for (const sid of structureIds) {
             try {
                 const structureData = await invoke<StructureInfo>('get_structure_name', {
-                    structureId: sid,
-                    accessToken
+                    characterId,
+                    structureId: sid
                 });
                 newNames[sid] = structureData.name;
             } catch (error) {
@@ -127,7 +125,6 @@ export async function fetchAssets(characterId: number, accessToken: string) {
         resolvedNames.set(newNames);
         personalAssets.set(rawAssets);
         groupedAssets.set(buildAssetTree(rawAssets, newNames));
-
     } catch (error) {
         console.error("Failed to fetch assets:", error);
         assetsErrorMessage.set(String(error));

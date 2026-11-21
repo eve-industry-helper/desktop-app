@@ -1,7 +1,7 @@
 import type { SecurityStatus, StructureType } from '$lib/types/frontend';
 
 export type RigSize = 'M' | 'L' | 'XL';
-export type StructureCategory = 'ec' | 'refinery' | 'citadel' | 'npc';
+type StructureCategory = 'ec' | 'refinery' | 'citadel' | 'npc';
 
 export interface StructureMeta {
     size: RigSize | null;

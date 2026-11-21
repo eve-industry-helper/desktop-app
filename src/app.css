@@ -1,12 +1,24 @@
 /* src/app.css */
 :root {
     --bg-color: #1e1e1e;
+    --bg-darker: #1a1a1b;
+    --bg-deep: #181819;
+    --surface: #252526;
+    --surface-hover: #2a2d2e;
     --card-bg: #2d2d2d;
     --text-main: #e0e0e0;
     --text-muted: #b0b0b0;
+    --text-dim: #888;
     --primary: #007acc;
     --primary-hover: #005f9e;
+    --btn-primary: #0e639c;
+    --btn-primary-hover: #1177bb;
+    --accent: #9cdcfe;
+    --warning: #dcdcaa;
+    --danger: #f48771;
     --border-color: #444;
+    --border-subtle: #2d2d30;
+    --border-input: #3c3c3c;
 }
 
 body {
@@ -34,4 +46,121 @@ body {
     padding: 2rem;
 }
 
-.divider { border: 0; height: 1px; background: var(--border-color); margin: 2rem 0; width: 100%; }
+.divider {
+    border: 0;
+    height: 1px;
+    background: var(--border-color);
+    margin: 2rem 0;
+    width: 100%;
+}
+
+/* Shared Typography & Status */
+.subtitle {
+    font-size: 0.85rem;
+    color: #aaa;
+}
+
+.error-text {
+    margin: 0;
+    color: var(--danger);
+    font-size: 0.85rem;
+}
+
+/* Shared Buttons */
+.primary-btn {
+    background-color: var(--btn-primary);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.primary-btn:hover:not(:disabled) {
+    background-color: var(--btn-primary-hover);
+}
+
+.primary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary-btn {
+    background-color: transparent;
+    color: #ccc;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.secondary-btn:hover:not(:disabled) {
+    background-color: var(--surface-hover);
+}
+
+.secondary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.remove-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: #ccc;
+    border-radius: 4px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.remove-btn:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.primary-btn.small,
+.secondary-btn.small,
+.remove-btn.small {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.78rem;
+}
+
+/* Shared Inputs & Labels */
+.field-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: #bbb;
+}
+
+.text-input {
+    width: 100%;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.82rem;
+    box-sizing: border-box;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+select.text-input {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    color-scheme: dark;
+}
+
+select.text-input option {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+}

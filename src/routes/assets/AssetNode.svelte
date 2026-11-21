@@ -51,7 +51,7 @@
                     src={iconUrl}
                     alt={itemName}
                     class="item-icon"
-                    on:error={handleImageError}
+                    on:error={(e) => handleImageError(e, node.type_id)}
             />
             <div class="item-details">
                 <span class="item-name">{itemName}</span>

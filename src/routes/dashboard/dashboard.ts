@@ -12,51 +12,20 @@ export const itemNames = writable<Record<number, string>>({});
 export const characterBlueprints = writable<Record<number, Blueprint>>({});
 
 export async function initializeDashboard() {
-    isFetchingJobs.set(true);
     try {
         await initializeApp();
     } catch (error) {
         errorMessage.set(`Error loading profiles: ${error}`);
-    } finally {
-        isFetchingJobs.set(false);
     }
 }
 
 export async function loadJobs(characterId: number) {
     isFetchingJobs.set(true);
+    errorMessage.set("");
     try {
-        const config: AppConfig = await invoke("load_config");
-        const tokenObj = config.tokens.find(t => t.character_id === characterId);
-
-        if (!tokenObj) {
-            errorMessage.set("Authentication token missing for this character.");
-            return;
-        }
-
-        const now = Math.floor(Date.now() / 1000);
-        if (tokenObj.expires_at < now + 60) {
-            if (!tokenObj.refresh_token) {
-                errorMessage.set("Session expired and no refresh token is available.");
-                return;
-            }
-
-            const refreshRes: any = await invoke("refresh_eve_token", {
-                refreshToken: tokenObj.refresh_token
-            });
-
-            tokenObj.access_token = refreshRes.access_token;
-            if (refreshRes.refresh_token) {
-                tokenObj.refresh_token = refreshRes.refresh_token;
-            }
-            tokenObj.expires_at = now + refreshRes.expires_in;
-
-            await invoke("save_config", { config });
-            configStore.set(config);
-        }
-
         const [jobs, bps] = await Promise.all([
-            invoke<IndustryJob[]>("get_industry_jobs", { characterId, accessToken: tokenObj.access_token }),
-            invoke<Blueprint[]>("get_blueprints", { characterId, accessToken: tokenObj.access_token })
+            invoke<IndustryJob[]>("get_industry_jobs", { characterId }),
+            invoke<Blueprint[]>("get_blueprints", { characterId })
         ]);
 
         const sortedJobs = jobs.sort((a, b) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime());

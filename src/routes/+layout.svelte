@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import type { Snippet } from 'svelte';
     import '../app.css';
     import TitleBar from '$lib/components/TitleBar/titlebar.svelte';
     import TopBar from '$lib/components/TopBar/topbar.svelte';
@@ -7,31 +8,34 @@
     import { page } from '$app/state';
     import { activeCharacterId, initializeApp } from '$lib/stores/global';
 
+    let { children }: { children: Snippet } = $props();
+
     onMount(() => {
         initializeApp();
     });
 
-    $: showNavigation = page.url.pathname !== '/login' && $activeCharacterId !== null;
+    let showNavigation = $derived(
+        page.url.pathname !== '/login' &&
+        page.url.pathname !== '/setup' &&
+        $activeCharacterId !== null
+    );
 </script>
 
 <div class="app-layout">
-    <!-- The custom window controls -->
     <TitleBar />
 
     <div class="main-workspace">
         {#if showNavigation}
-            <!-- Sidebar docked to the left -->
             <SideBar />
         {/if}
 
         <div class="right-column">
             {#if showNavigation}
-                <!-- TopBar handles portraits and the dynamic module sub-nav -->
                 <TopBar />
             {/if}
 
             <div class="page-content">
-                <slot />
+                {@render children()}
             </div>
         </div>
     </div>
@@ -62,6 +66,6 @@
         display: flex;
         flex-direction: column;
         flex-grow: 1;
-        min-width: 0; /* Prevents flex children from blowing out width */
+        min-width: 0;
     }
 </style>

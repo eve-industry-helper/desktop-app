@@ -1,29 +1,31 @@
 mod commands;
 mod core;
 
-use crate::commands::config::{save_config, load_config};
-use crate::commands::auth::{login_eve_standalone, refresh_eve_token};
+use crate::commands::auth::{login_eve_standalone};
+use crate::commands::config::{load_config, save_config};
 use crate::commands::esi::{
     get_active_character,
-    get_industry_jobs,
-    resolve_eve_names,
     get_blueprints,
     get_character_assets,
+    get_character_skills,
+    get_industry_jobs,
     get_structure_name,
     resolve_eve_ids,
-    get_character_skills
+    resolve_eve_names,
 };
 use crate::commands::industry::{
-    load_plans,
-    save_plans,
     get_blueprint_materials,
+    load_industry_settings,
+    load_plans,
     save_industry_settings,
-    load_industry_settings
+    save_plans,
 };
+use crate::core::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(AppState::new())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             save_config,
@@ -32,7 +34,6 @@ pub fn run() {
             get_active_character,
             get_industry_jobs,
             resolve_eve_names,
-            refresh_eve_token,
             get_blueprints,
             get_character_assets,
             get_structure_name,

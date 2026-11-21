@@ -1,12 +1,12 @@
 import type { ParsedFitItem } from '$lib/types/frontend';
 
-export interface EftModule {
+interface EftModule {
     name: string;
     charge?: string;
     offline: boolean;
 }
 
-export interface EftStack {
+interface EftStack {
     name: string;
     quantity: number;
 }

@@ -10,6 +10,7 @@ export interface AppModule {
     label: string;
     icon: string;
     href: string;
+    subNav?: SubNavLink[];
 }
 
 export interface SubNavLink {
@@ -19,7 +20,16 @@ export interface SubNavLink {
 
 export const appModules: AppModule[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '/icon-dashboard.png', href: '/dashboard' },
-    { id: 'industry', label: 'Industry', icon: '/icon-industry.png', href: '/industry' },
+    {
+        id: 'industry',
+        label: 'Industry',
+        icon: '/icon-industry.png',
+        href: '/industry',
+        subNav: [
+            { label: 'Plans', href: '/industry/plans' },
+            { label: 'Settings', href: '/industry/settings' }
+        ]
+    },
     { id: 'assets', label: 'Assets', icon: '/icon-assets.png', href: '/assets' },
     { id: 'about', label: 'About', icon: '/about.svg', href: '/about' },
 ];
@@ -34,7 +44,10 @@ export const activeCharacterId = writable<number | null>(null);
 
 let initPromise: Promise<void> | null = null;
 
-export function initializeApp(): Promise<void> {
+export function initializeApp(force = false): Promise<void> {
+    if (force) {
+        initPromise = null;
+    }
     if (initPromise) return initPromise;
 
     initPromise = (async () => {
@@ -42,9 +55,12 @@ export function initializeApp(): Promise<void> {
             const savedConfig = await invoke<AppConfig>('load_config');
             configStore.set(savedConfig);
 
-            if (!savedConfig.tokens || savedConfig.tokens.length === 0) {
-                if (window.location.pathname !== '/login' && window.location.pathname !== '/setup') {
-                    await goto('/login');
+            const hasTokens = Boolean(savedConfig.tokens && savedConfig.tokens.length > 0);
+            if (!hasTokens) {
+                initPromise = null;
+                const target = savedConfig.is_setup ? '/login' : '/setup';
+                if (window.location.pathname !== target) {
+                    await goto(target);
                 }
                 return;
             }
@@ -63,6 +79,7 @@ export function initializeApp(): Promise<void> {
                 activeCharacterId.set(fetchedProfiles[0].character_id);
             }
         } catch (error) {
+            initPromise = null;
             console.error('Failed to initialize app:', error);
         }
     })();

@@ -28,7 +28,7 @@
     <div class="content" style="justify-content: flex-start;">
 
         {#if $errorMessage}
-            <div class="settings-card">
+            <div class="error-card">
                 <p class="status error">{$errorMessage}</p>
                 <button class="primary-button" on:click={wipeConfig}>Wipe Configuration</button>
             </div>
@@ -58,7 +58,7 @@
                                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                                 {#if job.activity_id === 1 || job.activity_id === 9}
                                                     <span style="color: var(--primary);">
-                                                        ↳ {$itemNames[job.product_type_id] || 'Loading Product...'} (x{job.runs})
+                                                        ↳ {(job.product_type_id != null && $itemNames[job.product_type_id]) || 'Loading Product...'} (x{job.runs})
                                                     </span>
                                                 {:else if job.activity_id === 5}
                                                     <span style="color: var(--text-muted);">
@@ -66,7 +66,7 @@
                                                     </span>
                                                 {:else if job.activity_id === 8}
                                                     <span style="color: var(--text-muted);">
-                                                        ↳ {$itemNames[job.product_type_id] || 'Loading Datacore result...'} (Runs: {job.runs})
+                                                        ↳ {(job.product_type_id != null && $itemNames[job.product_type_id]) || 'Loading Datacore result...'} (Runs: {job.runs})
                                                     </span>
                                                 {:else if job.activity_id === 3 || job.activity_id === 4}
                                                     <span style="color: var(--text-muted);">
