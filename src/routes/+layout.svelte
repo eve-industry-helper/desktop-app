@@ -9,7 +9,7 @@
     import { activeCharacterId } from '$lib/stores/global';
     import { configStore } from '$lib/stores/configStore';
 
-    import type { AppConfig } from '$lib/types/config';
+    import type { AppConfig } from '$lib/types/backend/config';
 
     // Load the saved configuration from disk when the app starts
     onMount(async () => {

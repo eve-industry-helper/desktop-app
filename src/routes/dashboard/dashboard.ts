@@ -2,7 +2,7 @@ import { writable, get } from 'svelte/store';
 import { invoke } from "@tauri-apps/api/core";
 import { goto } from "$app/navigation";
 import { characters, activeCharacterId } from '$lib/stores/global';
-import type { AppConfig, CharacterProfile, IndustryJob, UniverseName, Blueprint } from '$lib/types';
+import type { AppConfig, CharacterProfile, IndustryJob, UniverseName, Blueprint } from '$lib/types/backend';
 
 export const activeJobs = writable<IndustryJob[]>([]);
 export const errorMessage = writable<string>("");

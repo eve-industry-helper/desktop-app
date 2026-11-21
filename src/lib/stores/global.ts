@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { CharacterProfile } from '$lib/types/esi';
+import type { CharacterProfile } from '$lib/types/backend/esi';
 
 export interface AppModule {
     id: string;

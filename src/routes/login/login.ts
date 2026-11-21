@@ -2,7 +2,7 @@ import { writable, get } from 'svelte/store';
 import { invoke } from "@tauri-apps/api/core";
 import { goto } from "$app/navigation";
 
-import type { AppConfig, EveToken } from "$lib/types";
+import type { AppConfig, EveToken } from "$lib/types/backend";
 
 interface TokenResponse {
     access_token: string;

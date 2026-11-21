@@ -2,8 +2,10 @@
     import './assets.css';
     import { activeCharacterId, moduleSubNav } from '$lib/stores/global';
     import { configStore } from '$lib/stores/configStore';
+    import AssetNode from './AssetNode.svelte';
     import {
         personalAssets,
+        groupedAssets,
         resolvedNames,
         isFetchingAssets,
         assetsErrorMessage,
@@ -14,7 +16,6 @@
         { label: "Personal Assets", href: "/assets" }
     ]);
 
-    // Safely verify configStore and activeCharacterId exist
     $: if ($activeCharacterId && $configStore?.tokens) {
         const activeTokenData = $configStore.tokens.find(t => t.character_id === $activeCharacterId);
 
@@ -29,40 +30,35 @@
 <div class="assets-container">
     <div class="header">
         <h2>Personal Assets</h2>
-        <span class="asset-count">Total Item Stacks: {$personalAssets.length}</span>
+        <span class="asset-count">
+            {$groupedAssets.length} Locations · {$personalAssets.length} Item Stacks
+        </span>
     </div>
 
     {#if $isFetchingAssets}
         <p class="loading">Fetching secure asset manifests...</p>
     {:else if $assetsErrorMessage}
         <p class="error">{$assetsErrorMessage}</p>
-    {:else if $personalAssets.length > 0}
-        <ul class="asset-list">
-            {#each $personalAssets as item}
-                <li class="asset-item">
-                    <img
-                            src={`https://images.evetech.net/types/${item.type_id}/icon?size=64`}
-                            alt="Item Icon"
-                            class="item-icon"
-                    />
-                    <div class="item-details">
-                        <span class="item-name">
-                            {$resolvedNames[item.type_id] || `Type ID: ${item.type_id}`}
+    {:else if $groupedAssets.length > 0}
+        <div class="locations-list">
+            {#each $groupedAssets as group (group.locationId)}
+                <details class="location-group">
+                    <summary class="location-header">
+                        <span class="location-title">
+                            <img src="/icon-location.svg" alt="" class="location-icon" />
+                            {group.name}
                         </span>
+                        <span class="location-count">{group.totalStacks} stacks</span>
+                    </summary>
 
-                        <div class="item-meta">
-                            <span class="item-quantity">Qty: {item.quantity}</span>
-                            <span class="item-location">
-                                📍 {$resolvedNames[item.location_id] || `Location ID: ${item.location_id}`}
-                            </span>
-                            {#if item.is_singleton}
-                                <span class="item-badge">Singleton / Packaged</span>
-                            {/if}
-                        </div>
-                    </div>
-                </li>
+                    <ul class="asset-tree">
+                        {#each group.items as item (item.item_id)}
+                            <AssetNode node={item} resolvedNames={$resolvedNames} />
+                        {/each}
+                    </ul>
+                </details>
             {/each}
-        </ul>
+        </div>
     {:else}
         <p class="empty">No assets found.</p>
     {/if}

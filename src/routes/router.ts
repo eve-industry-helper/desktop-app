@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import { invoke } from "@tauri-apps/api/core";
 import { goto } from "$app/navigation";
 
-import type { AppConfig } from "$lib/types";
+import type { AppConfig } from "$lib/types/backend";
 
 export const errorMessage = writable<string>("");
 
