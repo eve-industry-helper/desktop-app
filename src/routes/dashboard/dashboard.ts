@@ -1,8 +1,9 @@
-import { writable, get } from 'svelte/store';
+import { writable } from 'svelte/store';
 import { invoke } from "@tauri-apps/api/core";
 import { goto } from "$app/navigation";
-import { characters, activeCharacterId } from '$lib/stores/global';
-import type { AppConfig, CharacterProfile, IndustryJob, UniverseName, Blueprint } from '$lib/types/backend';
+import { characters, activeCharacterId, initializeApp, resetAppInit } from '$lib/stores/global';
+import { configStore } from '$lib/stores/configStore';
+import type { AppConfig, IndustryJob, UniverseName, Blueprint } from '$lib/types/backend';
 
 export const activeJobs = writable<IndustryJob[]>([]);
 export const errorMessage = writable<string>("");
@@ -13,23 +14,7 @@ export const characterBlueprints = writable<Record<number, Blueprint>>({});
 export async function initializeDashboard() {
     isFetchingJobs.set(true);
     try {
-        const config: AppConfig = await invoke("load_config");
-
-        if (!config.tokens || config.tokens.length === 0) {
-            goto('/login').catch(console.error);
-            return;
-        }
-
-        const profilesPromises = config.tokens.map(token =>
-            invoke<CharacterProfile>("get_active_character", { accessToken: token.access_token })
-        );
-
-        const fetchedProfiles = await Promise.all(profilesPromises);
-        characters.set(fetchedProfiles);
-
-        if (!get(activeCharacterId) && fetchedProfiles.length > 0) {
-            activeCharacterId.set(fetchedProfiles[0].character_id);
-        }
+        await initializeApp();
     } catch (error) {
         errorMessage.set(`Error loading profiles: ${error}`);
     } finally {
@@ -43,7 +28,6 @@ export async function loadJobs(characterId: number) {
         const config: AppConfig = await invoke("load_config");
         const tokenObj = config.tokens.find(t => t.character_id === characterId);
 
-        // Instead of throwing an exception locally, handle the state and return safely
         if (!tokenObj) {
             errorMessage.set("Authentication token missing for this character.");
             return;
@@ -67,6 +51,7 @@ export async function loadJobs(characterId: number) {
             tokenObj.expires_at = now + refreshRes.expires_in;
 
             await invoke("save_config", { config });
+            configStore.set(config);
         }
 
         const [jobs, bps] = await Promise.all([
@@ -86,7 +71,7 @@ export async function loadJobs(characterId: number) {
         const idsToResolve = new Set<number>();
         jobs.forEach(job => {
             if (job.blueprint_type_id) idsToResolve.add(job.blueprint_type_id);
-            if (job.product_type_id) idsToResolve.add(job.product_type_id); // The output item
+            if (job.product_type_id) idsToResolve.add(job.product_type_id);
         });
 
         if (idsToResolve.size > 0) {
@@ -110,11 +95,17 @@ export async function loadJobs(characterId: number) {
 }
 
 export async function wipeConfig() {
-    await invoke("save_config", {
-        config: { is_setup: false, mode: "Standalone", api_url: null, tokens: [] } // Wipes all tokens
-    });
+    const emptyConfig: AppConfig = {
+        is_setup: false,
+        mode: "Standalone",
+        api_url: null,
+        tokens: []
+    };
+    await invoke("save_config", { config: emptyConfig });
+    configStore.set(emptyConfig);
     characters.set([]);
     activeCharacterId.set(null);
+    resetAppInit();
     goto('/setup').catch(console.error);
 }
 

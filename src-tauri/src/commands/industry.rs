@@ -3,7 +3,54 @@ use std::fs;
 use std::path::PathBuf;
 use reqwest::Client;
 use tauri::{AppHandle, Manager};
-use crate::core::models::industry::{IndustryPlan, RawMaterial, SdeBlueprint};
+use crate::core::models::industry::{
+    IndustryPlan,
+    RawMaterial,
+    SdeBlueprint,
+    IndustrySettings
+};
+
+fn get_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
+
+    if !dir.exists() {
+        fs::create_dir_all(&dir)
+            .map_err(|e| format!("Failed to create app data dir: {}", e))?;
+    }
+
+    Ok(dir.join("industry_settings.json"))
+}
+
+#[tauri::command]
+pub fn save_industry_settings(
+    app: AppHandle,
+    settings: IndustrySettings,
+) -> Result<(), String> {
+    let path = get_settings_path(&app)?;
+    let json = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Failed to serialize industry settings: {}", e))?;
+
+    fs::write(&path, json)
+        .map_err(|e| format!("Failed to write industry_settings.json: {}", e))
+}
+
+#[tauri::command]
+pub fn load_industry_settings(app: AppHandle) -> Result<IndustrySettings, String> {
+    let path = get_settings_path(&app)?;
+
+    if !path.exists() {
+        return Ok(IndustrySettings::default());
+    }
+
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read industry_settings.json: {}", e))?;
+
+    serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse industry_settings.json: {}", e))
+}
 
 fn get_plans_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app

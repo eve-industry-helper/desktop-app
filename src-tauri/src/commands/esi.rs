@@ -10,7 +10,8 @@ use crate::core::models::eve::{
     UniverseName,
     StructureInfo,
     UniverseIdsResponse,
-    UniverseIdEntry
+    UniverseIdEntry,
+    CharacterSkillsResponse
 };
 
 #[tauri::command]
@@ -177,6 +178,34 @@ pub async fn resolve_eve_ids(names: Vec<String>) -> Result<Vec<UniverseIdEntry>,
             .await
             .map_err(|e| format!("JSON parsing failed: {}", e))?;
         Ok(data.inventory_types.unwrap_or_default())
+    } else {
+        let status = res.status();
+        let err_text = res.text().await.unwrap_or_default();
+        Err(format!("ESI API error (Status {}): {}", status, err_text))
+    }
+}
+
+#[tauri::command]
+pub async fn get_character_skills(
+    character_id: u32,
+    access_token: String,
+) -> Result<CharacterSkillsResponse, String> {
+    let url = format!(
+        "https://esi.evetech.net/latest/characters/{}/skills/",
+        character_id
+    );
+
+    let res = Client::new()
+        .get(&url)
+        .bearer_auth(&access_token)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if res.status().is_success() {
+        res.json::<CharacterSkillsResponse>()
+            .await
+            .map_err(|e| format!("JSON parsing failed: {}", e))
     } else {
         let status = res.status();
         let err_text = res.text().await.unwrap_or_default();

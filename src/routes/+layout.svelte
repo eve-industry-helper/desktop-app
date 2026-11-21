@@ -1,24 +1,14 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { invoke } from '@tauri-apps/api/core';
     import '../app.css';
     import TitleBar from '$lib/components/TitleBar/titlebar.svelte';
     import TopBar from '$lib/components/TopBar/topbar.svelte';
     import SideBar from '$lib/components/SideBar/sidebar.svelte';
     import { page } from '$app/state';
-    import { activeCharacterId } from '$lib/stores/global';
-    import { configStore } from '$lib/stores/configStore';
+    import { activeCharacterId, initializeApp } from '$lib/stores/global';
 
-    import type { AppConfig } from '$lib/types/backend/config';
-
-    // Load the saved configuration from disk when the app starts
-    onMount(async () => {
-        try {
-            const savedConfig = await invoke<AppConfig>('load_config');
-            configStore.set(savedConfig);
-        } catch (error) {
-            console.error("Failed to load config from disk:", error);
-        }
+    onMount(() => {
+        initializeApp();
     });
 
     $: showNavigation = page.url.pathname !== '/login' && $activeCharacterId !== null;

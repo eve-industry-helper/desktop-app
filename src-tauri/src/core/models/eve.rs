@@ -106,3 +106,18 @@ pub struct UniverseIdEntry {
 pub struct UniverseIdsResponse {
     pub inventory_types: Option<Vec<UniverseIdEntry>>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CharacterSkill {
+    pub skill_id: u32,
+    pub active_skill_level: u8,
+    pub trained_skill_level: u8,
+    pub skillpoints_in_skill: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CharacterSkillsResponse {
+    pub skills: Vec<CharacterSkill>,
+    pub total_sp: u64,
+    pub unallocated_sp: Option<u64>,
+}

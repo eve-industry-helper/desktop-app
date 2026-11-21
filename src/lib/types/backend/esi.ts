@@ -75,3 +75,16 @@ export interface StructureInfo {
     solar_system_id: number;
     type_id: number | null;
 }
+
+export interface CharacterSkill {
+    skill_id: number;
+    active_skill_level: number;
+    trained_skill_level: number;
+    skillpoints_in_skill: number;
+}
+
+export interface CharacterSkillsResponse {
+    skills: CharacterSkill[];
+    total_sp: number;
+    unallocated_sp?: number;
+}

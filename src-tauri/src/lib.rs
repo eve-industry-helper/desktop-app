@@ -4,10 +4,22 @@ mod core;
 use crate::commands::config::{save_config, load_config};
 use crate::commands::auth::{login_eve_standalone, refresh_eve_token};
 use crate::commands::esi::{
-    get_active_character, get_industry_jobs, resolve_eve_names,
-    get_blueprints, get_character_assets, get_structure_name, resolve_eve_ids
+    get_active_character,
+    get_industry_jobs,
+    resolve_eve_names,
+    get_blueprints,
+    get_character_assets,
+    get_structure_name,
+    resolve_eve_ids,
+    get_character_skills
 };
-use crate::commands::industry::{ load_plans, save_plans, get_blueprint_materials };
+use crate::commands::industry::{
+    load_plans,
+    save_plans,
+    get_blueprint_materials,
+    save_industry_settings,
+    load_industry_settings
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,7 +39,10 @@ pub fn run() {
             resolve_eve_ids,
             load_plans,
             save_plans,
-            get_blueprint_materials
+            get_blueprint_materials,
+            get_character_skills,
+            save_industry_settings,
+            load_industry_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
