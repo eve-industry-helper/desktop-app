@@ -15,6 +15,11 @@ export interface Asset {
     is_blueprint_copy: boolean | null;
 }
 
+export interface UniverseIdMatch {
+    id: number;
+    name: string;
+}
+
 export interface UniverseName {
     id: number;
     name: string;

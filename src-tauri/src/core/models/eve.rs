@@ -95,3 +95,14 @@ pub struct StructureInfo {
     pub solar_system_id: u32,
     pub type_id: Option<u32>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UniverseIdEntry {
+    pub id: u32,
+    pub name: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct UniverseIdsResponse {
+    pub inventory_types: Option<Vec<UniverseIdEntry>>,
+}

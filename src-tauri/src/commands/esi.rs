@@ -8,7 +8,9 @@ use crate::core::models::eve::{
     IndustryJob,
     JwtPayload,
     UniverseName,
-    StructureInfo
+    StructureInfo,
+    UniverseIdsResponse,
+    UniverseIdEntry
 };
 
 #[tauri::command]
@@ -146,6 +148,35 @@ pub async fn get_structure_name(structure_id: u64, access_token: String) -> Resu
     if res.status().is_success() {
         let info: StructureInfo = res.json().await.map_err(|e| format!("JSON parsing failed: {}", e))?;
         Ok(info)
+    } else {
+        let status = res.status();
+        let err_text = res.text().await.unwrap_or_default();
+        Err(format!("ESI API error (Status {}): {}", status, err_text))
+    }
+}
+
+#[tauri::command]
+pub async fn resolve_eve_ids(names: Vec<String>) -> Result<Vec<UniverseIdEntry>, String> {
+    if names.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let url = "https://esi.evetech.net/latest/universe/ids/";
+    let client = Client::new();
+
+    let res = client
+        .post(url)
+        .json(&names)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if res.status().is_success() {
+        let data: UniverseIdsResponse = res
+            .json()
+            .await
+            .map_err(|e| format!("JSON parsing failed: {}", e))?;
+        Ok(data.inventory_types.unwrap_or_default())
     } else {
         let status = res.status();
         let err_text = res.text().await.unwrap_or_default();
