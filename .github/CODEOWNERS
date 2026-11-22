@@ -1,0 +1,5 @@
+# Default owners for the entire repository
+* @your-org/maintainers
+
+# Protect CI workflows, security configs, and CODEOWNERS itself
+/.github/ @your-org/security-admins
