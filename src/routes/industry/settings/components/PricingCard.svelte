@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { priceSettings } from '$lib/stores/industrySettings';
+    import { priceSettings } from '#lib/stores/industrySettings';
     import {
         MARKET_HUBS,
         PRICE_BASIS_OPTIONS,

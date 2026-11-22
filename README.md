@@ -50,7 +50,7 @@ Before developing or building the application, ensure you have the following ins
    ```bash
    pnpm tauri build
    ```
-   This compiles the SvelteKit frontend into static assets, builds the optimized Rust binary, and packages native installers for your operating system.
+   This compiles the SvelteKit frontend into static assets, builds the optimised Rust binary, and packages native installers for your operating system.
 
 3. **Locate your installer or executable:**
    Once the build finishes, the compiled files are located in `src-tauri/target/release/bundle/`:

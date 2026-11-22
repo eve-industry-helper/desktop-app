@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
-import type { Asset, UniverseName, StructureInfo } from '$lib/types/backend/esi';
-import type { AssetNode, LocationGroup } from '$lib/types/frontend/assets';
+import type { Asset, UniverseName, StructureInfo } from '#lib/types/backend/esi';
+import type { AssetNode, LocationGroup } from '#lib/types/frontend/assets';
 
 export const personalAssets = writable<Asset[]>([]);
 export const groupedAssets = writable<LocationGroup[]>([]);

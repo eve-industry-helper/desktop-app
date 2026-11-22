@@ -1,6 +1,6 @@
 <script lang="ts">
     import "./about.css"
-    import { moduleSubNav } from '$lib/stores/global';
+    import { moduleSubNav } from '#lib/stores/global';
 
     $: moduleSubNav.set([]);
 </script>

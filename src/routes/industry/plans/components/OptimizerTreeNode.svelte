@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DecisionOverride, OptimizedNode } from '$lib/types/backend';
+    import type { DecisionOverride, OptimizedNode } from '#lib/types/backend';
     import OptimizerTreeNode from './OptimizerTreeNode.svelte';
     import {
         activeOverrides,

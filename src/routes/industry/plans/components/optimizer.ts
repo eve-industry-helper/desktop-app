@@ -1,14 +1,14 @@
 import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
-import { activeCharacterId } from '$lib/stores/global';
+import { activeCharacterId } from '#lib/stores/global';
 import type {
     DecisionOverride,
     OptimizationResult,
     OptimizePlanRequest,
     OptimizeScope,
     ShoppingItem
-} from '$lib/types/backend';
-import type { BuildConfig, IndustryPlan, PlanEntry } from '$lib/types/frontend';
+} from '#lib/types/backend';
+import type { BuildConfig, IndustryPlan, PlanEntry } from '#lib/types/frontend';
 import {
     ensureBuildConfig,
     selectedEntry,
@@ -205,12 +205,19 @@ export function formatIsk(value: number): string {
     if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toFixed(2)}B ISK`;
     if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(2)}M ISK`;
     if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}K ISK`;
-    return `${sign}${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })} ISK`;
+    return `${sign}${formatIskExact(abs)} ISK`;
 }
 
-export function formatIskExact(value: number): string {
+export function formatIskExact(value: number, maxFractionDigits = 2): string {
     if (!Number.isFinite(value)) return '0';
-    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const negative = value < 0;
+    const abs = Math.abs(value);
+    const fixed = abs.toFixed(maxFractionDigits);
+    const [intPart, rawFrac] = fixed.split('.');
+    const groupedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+    const fracPart = rawFrac ? rawFrac.replace(/0+$/, '') : '';
+    const formatted = fracPart ? `${groupedInt}.${fracPart}` : groupedInt;
+    return negative && formatted !== '0' ? `-${formatted}` : formatted;
 }
 
 export function formatDuration(totalSecs: number): string {

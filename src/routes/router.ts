@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { goto } from '$app/navigation';
-import { initializeApp } from '$lib/stores/global';
-import { configStore } from '$lib/stores/configStore';
+import { initializeApp } from '#lib/stores/global';
+import { configStore } from '#lib/stores/configStore';
 
 export const errorMessage = writable<string>('');
 

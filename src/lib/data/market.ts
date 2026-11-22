@@ -1,4 +1,4 @@
-import type { PriceBasis, PriceProvider } from '$lib/types/frontend';
+import type { PriceBasis, PriceProvider } from '#lib/types/frontend';
 
 export interface MarketHub {
     id: number;          // Region ID (used by Fuzzwork & EVETycoon)

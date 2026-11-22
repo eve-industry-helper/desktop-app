@@ -1,9 +1,14 @@
 <script lang="ts">
     import './dashboard.css';
-    import { onMount } from "svelte";
-    import { activeCharacterId } from '$lib/stores/global';
+    import { onDestroy, onMount } from "svelte";
+    import { activeCharacterId } from '#lib/stores/global';
+    import { computedModifiers, lastSyncedCharacter } from '#lib/stores/industrySettings';
+    import JobCategoryCard from './components/JobCategoryCard.svelte';
     import {
+        INDUSTRY_CATEGORIES,
+        OTHER_CATEGORY_META,
         activeJobs,
+        jobsByCategory,
         itemNames,
         characterBlueprints,
         errorMessage,
@@ -11,91 +16,105 @@
         initializeDashboard,
         loadJobs,
         wipeConfig,
-        getActivityName,
-        getTimeRemaining,
-        getJobProgress,
-        getJobImage
+        isJobReady,
+        type JobCategoryGroupKey
     } from "./dashboard";
 
-    onMount(initializeDashboard);
+    let now = Date.now();
+    let timerId: ReturnType<typeof setInterval> | null = null;
+
+    onMount(() => {
+        void initializeDashboard();
+        timerId = setInterval(() => {
+            now = Date.now();
+        }, 30_000);
+    });
+
+    onDestroy(() => {
+        if (timerId !== null) {
+            clearInterval(timerId);
+        }
+    });
 
     $: if ($activeCharacterId) {
-        loadJobs($activeCharacterId);
+        void loadJobs($activeCharacterId);
+    }
+
+    $: hasSyncedSkills = $lastSyncedCharacter !== null;
+    $: totalReadyCount = $activeJobs.filter(job => isJobReady(job, now)).length;
+
+    function getMaxSlots(key: JobCategoryGroupKey): number | null {
+        if (!hasSyncedSkills) return null;
+        if (key === 'manufacturing') return $computedModifiers.maxManufacturingSlots;
+        if (key === 'science') return $computedModifiers.maxScienceSlots;
+        if (key === 'reactions') return $computedModifiers.maxReactionSlots;
+        return null;
+    }
+
+    function refreshJobs() {
+        if ($activeCharacterId) {
+            now = Date.now();
+            void loadJobs($activeCharacterId);
+        }
     }
 </script>
 
-<main class="container">
-    <div class="content" style="justify-content: flex-start;">
-
-        {#if $errorMessage}
-            <div class="error-card">
-                <p class="status error">{$errorMessage}</p>
-                <button class="primary-button" on:click={wipeConfig}>Wipe Configuration</button>
-            </div>
-        {:else}
-            <div class="dashboard-grid">
-                <div class="module-card">
-                    <h3 style="margin-top: 0; color: #fff;">Active Jobs ({$activeJobs.length})</h3>
-
-                    {#if $isFetchingJobs}
-                        <p>Querying ESI...</p>
-                    {:else if $activeJobs.length === 0}
-                        <p>No active industry jobs found.</p>
-                    {:else}
-                        <ul class="job-list">
-                            {#each $activeJobs as job}
-                                <li class="job-item">
-                                    <img src={getJobImage(job)} alt="Job Icon" style="width: 64px; height: 64px; border-radius: 4px; background: rgba(0,0,0,0.2); flex-shrink: 0"/>
-                                    <div style="flex-grow: 1; display: flex; flex-direction: column; height: 64px;">
-                                        <div class="job-header">
-                                            <span class="job-type activity-{job.activity_id}">
-                                                {getActivityName(job.activity_id)} - {$itemNames[job.blueprint_type_id] || `Loading BP ${job.blueprint_type_id}...`}
-                                            </span>
-                                            <span class="job-status" data-status={job.status}>{job.status}</span>
-                                        </div>
-
-                                        <div class="job-details">
-                                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                                {#if job.activity_id === 1 || job.activity_id === 9}
-                                                    <span style="color: var(--primary);">
-                                                        ↳ {(job.product_type_id != null && $itemNames[job.product_type_id]) || 'Loading Product...'} (x{job.runs})
-                                                    </span>
-                                                {:else if job.activity_id === 5}
-                                                    <span style="color: var(--text-muted);">
-                                                        ↳ Copies: {job.runs} | Runs per copy: {job.licensed_runs || 1}
-                                                    </span>
-                                                {:else if job.activity_id === 8}
-                                                    <span style="color: var(--text-muted);">
-                                                        ↳ {(job.product_type_id != null && $itemNames[job.product_type_id]) || 'Loading Datacore result...'} (Runs: {job.runs})
-                                                    </span>
-                                                {:else if job.activity_id === 3 || job.activity_id === 4}
-                                                    <span style="color: var(--text-muted);">
-                                                        {#if $characterBlueprints[job.blueprint_id]}
-                                                            {@const bp = $characterBlueprints[job.blueprint_id]}
-                                                            {#if job.activity_id === 3}
-                                                                ↳ TE {bp.time_efficiency} ➔ {bp.time_efficiency + (job.runs * 2)}
-                                                            {:else}
-                                                                ↳ ME {bp.material_efficiency} ➔ {bp.material_efficiency + job.runs}
-                                                            {/if}
-                                                        {:else}
-                                                            ↳ Researching +{job.runs} Levels
-                                                        {/if}
-                                                    </span>
-                                                {/if}
-                                                <span>{getTimeRemaining(job.end_date)}</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="job-progress-bg">
-                                            <div class="job-progress-fill" data-status={job.status} style="width: {getJobProgress(job.start_date, job.end_date)}%"></div>
-                                        </div>
-                                    </div>
-                                </li>
-                            {/each}
-                        </ul>
+<main class="dashboard-container">
+    <div class="dashboard-topbar">
+        <div class="dashboard-title-block">
+            <h2>Industry Dashboard</h2>
+            <span class="subtitle">
+                {#if $isFetchingJobs}
+                    Syncing active industry jobs from ESI...
+                {:else}
+                    {$activeJobs.length} active {$activeJobs.length === 1 ? 'job' : 'jobs'}
+                    {#if totalReadyCount > 0}
+                        · <span class="ready-summary">{totalReadyCount} ready to deliver</span>
                     {/if}
-                </div>
-            </div>
-        {/if}
+                {/if}
+            </span>
+        </div>
+
+        <button
+            type="button"
+            class="secondary-btn"
+            onclick={refreshJobs}
+            disabled={$isFetchingJobs || !$activeCharacterId}
+        >
+            {$isFetchingJobs ? 'Refreshing...' : 'Refresh Jobs'}
+        </button>
     </div>
+
+    {#if $errorMessage}
+        <div class="error-card">
+            <p class="error-text">{$errorMessage}</p>
+            <button type="button" class="primary-btn" onclick={() => void wipeConfig()}>Wipe Configuration</button>
+        </div>
+    {:else}
+        <div class="dashboard-grid">
+            {#each INDUSTRY_CATEGORIES as category (category.key)}
+                <JobCategoryCard
+                    {category}
+                    jobs={$jobsByCategory[category.key]}
+                    maxSlots={getMaxSlots(category.key)}
+                    isLoading={$isFetchingJobs}
+                    itemNames={$itemNames}
+                    characterBlueprints={$characterBlueprints}
+                    {now}
+                />
+            {/each}
+
+            {#if $jobsByCategory.other.length > 0}
+                <JobCategoryCard
+                    category={OTHER_CATEGORY_META}
+                    jobs={$jobsByCategory.other}
+                    maxSlots={null}
+                    isLoading={$isFetchingJobs}
+                    itemNames={$itemNames}
+                    characterBlueprints={$characterBlueprints}
+                    {now}
+                />
+            {/if}
+        </div>
+    {/if}
 </main>

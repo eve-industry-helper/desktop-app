@@ -1,8 +1,8 @@
 import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
-import { activeCharacterId, characters } from '$lib/stores/global';
-import { INDUSTRY_SKILLS, SKILL_GROUP_ORDER } from '$lib/data/industrySkills';
-import type { CharacterSkillsResponse } from '$lib/types/backend';
+import { activeCharacterId, characters } from '#lib/stores/global';
+import { INDUSTRY_SKILLS, SKILL_GROUP_ORDER } from '#lib/data/industrySkills';
+import type { CharacterSkillsResponse } from '#lib/types/backend';
 import type {
     ComputedIndustryModifiers,
     IndustrySettings,
@@ -11,7 +11,7 @@ import type {
     PriceSettings,
     SecurityStatus,
     StructureType
-} from '$lib/types/frontend';
+} from '#lib/types/frontend';
 
 const DEFAULT_PRICING: PriceSettings = {
     provider: 'fuzzwork',

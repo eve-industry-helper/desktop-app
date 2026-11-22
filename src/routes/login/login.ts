@@ -2,8 +2,8 @@ import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { goto } from '$app/navigation';
 
-import type { AppConfig, CharacterProfile, EveToken, TokenResponse } from '$lib/types/backend';
-import { activeCharacterId, initializeApp } from '$lib/stores/global';
+import type { AppConfig, CharacterProfile, EveToken, TokenResponse } from '#lib/types/backend';
+import { activeCharacterId, initializeApp } from '#lib/stores/global';
 
 export const config = writable<AppConfig | null>(null);
 export const statusMessage = writable<string>('');

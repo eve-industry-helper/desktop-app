@@ -1,7 +1,7 @@
 <script lang="ts">
     import './assets.css';
-    import { activeCharacterId, moduleSubNav } from '$lib/stores/global';
-    import { configStore } from '$lib/stores/configStore';
+    import { activeCharacterId, moduleSubNav } from '#lib/stores/global';
+    import { configStore } from '#lib/stores/configStore';
     import AssetNode from './components/AssetNode.svelte';
     import {
         personalAssets,

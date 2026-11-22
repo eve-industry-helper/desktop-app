@@ -1,6 +1,6 @@
 <script lang="ts">
     import './topbar.css';
-    import { appModules, characters, activeCharacterId } from '$lib/stores/global';
+    import { appModules, characters, activeCharacterId } from '#lib/stores/global';
     import { page } from '$app/state';
     import { addCharacter, selectCharacter } from './topbar';
 

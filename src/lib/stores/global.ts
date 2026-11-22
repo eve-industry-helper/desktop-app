@@ -1,9 +1,9 @@
 import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { goto } from '$app/navigation';
-import { configStore } from '$lib/stores/configStore';
-import type { AppConfig } from '$lib/types/backend/config';
-import type { CharacterProfile } from '$lib/types/backend/esi';
+import { configStore } from '#lib/stores/configStore';
+import type { AppConfig } from '#lib/types/backend/config';
+import type { CharacterProfile } from '#lib/types/backend/esi';
 
 export interface AppModule {
     id: string;

@@ -1,4 +1,4 @@
-import type { ParsedFitItem } from '$lib/types/frontend';
+import type { ParsedFitItem } from '#lib/types/frontend';
 
 interface EftModule {
     name: string;

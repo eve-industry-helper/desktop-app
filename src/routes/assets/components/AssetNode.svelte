@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { AssetNode } from '$lib/types/frontend/assets';
+    import type { AssetNode } from '#lib/types/frontend/assets';
     import { getIconUrl, handleImageError } from '../assets';
 
     export let node: AssetNode;

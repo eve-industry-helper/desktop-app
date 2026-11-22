@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { BuildConfig, IndustryPlan, PlanEntry } from '$lib/types/frontend';
-    import { structuresList } from '$lib/stores/industrySettings';
+    import type { BuildConfig, IndustryPlan, PlanEntry } from '#lib/types/frontend';
+    import { structuresList } from '#lib/stores/industrySettings';
     import { ensureBuildConfig, removeEntry, validationVersion } from '../plans';
     import {
         activeOverrides,
@@ -23,6 +23,7 @@
         unvalidatePlan,
         validatePlan
     } from './optimizer';
+    import JobQueuePanel from './JobQueuePanel.svelte';
     import OptimizerTreeNode from './OptimizerTreeNode.svelte';
     import ReprocessingPanel from './ReprocessingPanel.svelte';
 
@@ -652,45 +653,7 @@
                 </div>
             {/if}
         {:else if $activeResultTab === 'jobs'}
-            {#if optResult.jobQueue.length > 0}
-                <div class="opt-table">
-                    <div class="opt-table-head job-grid">
-                        <span>Product</span>
-                        <span>Activity</span>
-                        <span class="num">Runs (Out)</span>
-                        <span class="num">Duration</span>
-                        <span class="num">Job Cost</span>
-                    </div>
-                    {#each optResult.jobQueue as job (job.blueprintTypeId)}
-                        <div class="opt-table-row job-grid">
-                            <span class="item-cell">
-                                <img
-                                        src={`https://images.evetech.net/types/${job.productTypeId}/icon?size=32`}
-                                        alt={job.productName}
-                                        class="material-icon"
-                                />
-                                <span>{job.productName}</span>
-                            </span>
-                            <span>
-                                <span
-                                        class="entry-badge"
-                                        class:bp={job.activity === 'manufacturing'}
-                                        class:rxn={job.activity === 'reaction'}
-                                >
-                                    {job.activity === 'manufacturing' ? 'MFG' : 'RXN'}
-                                </span>
-                            </span>
-                            <span class="num mono">{job.runs.toLocaleString()} ({job.outputQty.toLocaleString()})</span>
-                            <span class="num mono">{formatDuration(job.durationSecs)}</span>
-                            <span class="num mono">{formatIskExact(job.jobCost)}</span>
-                        </div>
-                    {/each}
-                </div>
-            {:else}
-                <div class="workspace-empty">
-                    <p>No manufacturing or reaction jobs scheduled (all items set to Buy or covered by stock).</p>
-                </div>
-            {/if}
+            <JobQueuePanel jobs={optResult.jobQueue} />
         {/if}
     {:else}
         <div class="workspace-empty">

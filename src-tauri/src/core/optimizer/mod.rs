@@ -1,5 +1,6 @@
 pub mod bonuses;
 pub mod dag;
+pub mod job_queue;
 pub mod reprocess_lp;
 pub mod stock;
 
@@ -17,7 +18,7 @@ use crate::core::models::industry::{
     PlanEntryKind,
     ReservedResource,
 };
-use crate::core::models::sde::{BlueprintActivity, SdeIndex};
+use crate::core::models::sde::SdeIndex;
 use crate::core::optimizer::bonuses::{
     effective_sell_unit_revenue,
     is_base_mineral,
@@ -31,6 +32,8 @@ use crate::core::optimizer::dag::{
     NodeDecision,
     OptimizedNode,
 };
+pub use crate::core::optimizer::job_queue::JobSummary;
+use crate::core::optimizer::job_queue::build_ordered_job_queue;
 use crate::core::optimizer::reprocess_lp::{
     find_candidate_compressed_ores,
     solve_mineral_reprocessing,
@@ -94,19 +97,6 @@ pub struct ShoppingItem {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct JobSummary {
-    pub blueprint_type_id: u32,
-    pub product_type_id: u32,
-    pub product_name: String,
-    pub activity: BlueprintActivity,
-    pub runs: u64,
-    pub output_qty: u64,
-    pub job_cost: f64,
-    pub duration_secs: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct OptimizationResult {
     pub total_revenue_net: f64,
     pub total_buy_materials_cost: f64,
@@ -145,7 +135,6 @@ fn accumulate_tree(
     node: &OptimizedNode,
     buy_totals: &mut HashMap<u32, (u64, f64)>,
     stock_totals: &mut HashMap<u32, (u64, f64)>,
-    jobs: &mut HashMap<u32, JobSummary>,
 ) {
     if node.from_local_stock > 0 {
         let entry = stock_totals
@@ -162,24 +151,8 @@ fn accumulate_tree(
             entry.0 += node.net_qty;
         }
         NodeDecision::Craft => {
-            if let (Some(bp_id), Some(activity)) = (node.blueprint_type_id, node.activity) {
-                let job = jobs.entry(bp_id).or_insert_with(|| JobSummary {
-                    blueprint_type_id: bp_id,
-                    product_type_id: node.type_id,
-                    product_name: node.name.clone(),
-                    activity,
-                    runs: 0,
-                    output_qty: 0,
-                    job_cost: 0.0,
-                    duration_secs: 0,
-                });
-                job.runs += node.runs;
-                job.output_qty += node.output_qty;
-                job.job_cost += node.job_cost;
-                job.duration_secs += node.job_duration_secs;
-            }
             for child in &node.children {
-                accumulate_tree(child, buy_totals, stock_totals, jobs);
+                accumulate_tree(child, buy_totals, stock_totals);
             }
         }
         _ => {}
@@ -510,19 +483,20 @@ pub async fn run_optimizer(
     // 5. Consolidate Shopping List, Job Queue, and Local Stock Savings
     let mut buy_totals: HashMap<u32, (u64, f64)> = HashMap::new();
     let mut stock_totals: HashMap<u32, (u64, f64)> = HashMap::new();
-    let mut jobs_map: HashMap<u32, JobSummary> = HashMap::new();
 
     for node in &nodes {
-        accumulate_tree(node, &mut buy_totals, &mut stock_totals, &mut jobs_map);
+        accumulate_tree(node, &mut buy_totals, &mut stock_totals);
     }
+
+    let job_queue = build_ordered_job_queue(&nodes);
 
     let local_stock_value_saved: f64 = stock_totals
         .values()
         .map(|(qty, price)| (*qty as f64) * price)
         .sum();
 
-    let total_job_cost: f64 = jobs_map.values().map(|j| j.job_cost).sum();
-    let total_job_duration_secs: u64 = jobs_map.values().map(|j| j.duration_secs).sum();
+    let total_job_cost: f64 = job_queue.iter().map(|j| j.job_cost).sum();
+    let total_job_duration_secs: u64 = job_queue.iter().map(|j| j.duration_secs).sum();
     let total_buy_materials_cost: f64 = buy_totals
         .values()
         .map(|(qty, price)| (*qty as f64) * price)
@@ -608,9 +582,6 @@ pub async fn run_optimizer(
     }
 
     shopping_list.sort_by(|a, b| b.total_cost.total_cmp(&a.total_cost));
-
-    let mut job_queue: Vec<JobSummary> = jobs_map.into_values().collect();
-    job_queue.sort_by_key(|a| std::cmp::Reverse(a.duration_secs));
 
     let mut used_local_resources: Vec<ReservedResource> = consumed_by_loc
         .into_iter()

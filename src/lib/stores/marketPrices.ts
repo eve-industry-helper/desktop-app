@@ -1,8 +1,8 @@
 import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
-import { priceSettings } from '$lib/stores/industrySettings';
-import type { MarketPrice } from '$lib/types/backend';
-import type { PriceBasis } from '$lib/types/frontend';
+import { priceSettings } from '#lib/stores/industrySettings';
+import type { MarketPrice } from '#lib/types/backend';
+import type { PriceBasis } from '#lib/types/frontend';
 
 export const buyHubPrices = writable<Record<number, MarketPrice>>({});
 export const sellHubPrices = writable<Record<number, MarketPrice>>({});

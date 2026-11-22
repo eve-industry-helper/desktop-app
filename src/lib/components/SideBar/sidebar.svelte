@@ -1,7 +1,7 @@
 <script lang="ts">
     import './sidebar.css';
     import { page } from '$app/state';
-    import { appModules } from '$lib/stores/global';
+    import { appModules } from '#lib/stores/global';
 </script>
 
 <aside class="sidebar">

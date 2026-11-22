@@ -1,12 +1,12 @@
 import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
-import { parseEftFit } from '$lib/utils/eftParser';
-import { structuresList } from '$lib/stores/industrySettings';
+import { parseEftFit } from '#lib/utils/eftParser';
+import { structuresList } from '#lib/stores/industrySettings';
 import type {
     UniverseIdMatch,
     UniverseName,
     BlueprintSearchMatch
-} from '$lib/types/backend';
+} from '#lib/types/backend';
 import type {
     BuildConfig,
     IndustryPlan,
@@ -17,7 +17,7 @@ import type {
     PlanEntryKind,
     RawMaterial,
     ReservedResource,
-} from '$lib/types/frontend';
+} from '#lib/types/frontend';
 
 // Core state
 export const industryPlans = writable<IndustryPlan[]>([]);

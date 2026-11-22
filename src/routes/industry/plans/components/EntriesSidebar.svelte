@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { IndustryPlan } from '$lib/types/frontend';
+    import type { IndustryPlan } from '#lib/types/frontend';
     import {
         isAddingEntry,
         openAddEntry,

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { activeCharacterId } from '$lib/stores/global';
+    import { activeCharacterId } from '#lib/stores/global';
     import {
         computedModifiers,
         fetchCharacterSkills,
@@ -7,7 +7,7 @@
         isFetchingSkills,
         lastSyncedCharacter,
         settingsError
-    } from '$lib/stores/industrySettings';
+    } from '#lib/stores/industrySettings';
     import { formatSkillBonus } from '../settings';
 </script>
 

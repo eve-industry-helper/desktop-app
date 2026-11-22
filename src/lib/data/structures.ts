@@ -1,4 +1,4 @@
-import type { SecurityStatus, StructureType } from '$lib/types/frontend';
+import type { SecurityStatus, StructureType } from '#lib/types/frontend';
 
 export type RigSize = 'M' | 'L' | 'XL';
 type StructureCategory = 'ec' | 'refinery' | 'citadel' | 'npc';

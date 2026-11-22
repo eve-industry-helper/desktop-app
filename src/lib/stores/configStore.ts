@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { AppConfig } from '$lib/types/backend/config';
+import type { AppConfig } from '#lib/types/backend/config';
 
 const defaultConfig: AppConfig = {
     is_setup: false,

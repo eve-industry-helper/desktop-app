@@ -3,7 +3,7 @@ import type {
     DecisionOverride,
     PlanEntry,
     ReservedResource
-} from '$lib/types/frontend';
+} from '#lib/types/frontend';
 
 export type { DecisionOverride };
 export type OptimizeScope = 'entry' | 'plan';
@@ -71,6 +71,9 @@ export interface JobSummary {
     outputQty: number;
     jobCost: number;
     durationSecs: number;
+    stage: number;
+    prerequisiteBlueprintIds: number[];
+    usedBy: string[];
 }
 
 export interface OrePurchasePlan {

@@ -33,16 +33,16 @@ where
             f.write_str("a float, integer, or numeric string")
         }
 
-        fn visit_f64<E: de::Error>(self, v: f64) -> Result<f64, E> {
-            Ok(v)
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<f64, E> {
+            Ok(v as f64)
         }
 
         fn visit_u64<E: de::Error>(self, v: u64) -> Result<f64, E> {
             Ok(v as f64)
         }
 
-        fn visit_i64<E: de::Error>(self, v: i64) -> Result<f64, E> {
-            Ok(v as f64)
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<f64, E> {
+            Ok(v)
         }
 
         fn visit_str<E: de::Error>(self, v: &str) -> Result<f64, E> {

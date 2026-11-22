@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { ReprocessingPlan } from '$lib/types/backend';
+    import type { ReprocessingPlan } from '#lib/types/backend';
     import { copyMultibuy, formatIsk, formatIskExact } from './optimizer';
 
     export let plan: ReprocessingPlan;

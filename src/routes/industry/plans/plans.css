@@ -930,11 +930,497 @@
     min-width: 0;
 }
 
+.shop-item-col,
+.job-item-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
 .shop-item-col {
+    gap: 0.25rem;
+}
+
+.job-item-col {
+    gap: 0.15rem;
+}
+
+.job-queue-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.job-stage-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.job-stage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.job-stage-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.job-step-pill {
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    background-color: rgba(86, 156, 214, 0.14);
+    border: 1px solid rgba(86, 156, 214, 0.35);
+    border-radius: 3px;
+    padding: 0.12rem 0.42rem;
+}
+
+.job-stage-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.76rem;
+    color: #999;
+}
+
+.job-feeds-meta {
+    font-size: 0.72rem;
+    color: #999;
+    padding-left: calc(22px + 0.5rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.job-feeds-meta.final {
+    color: #4ec9b0;
+}
+
+.job-queue-bar {
+    flex-wrap: wrap;
+}
+
+.job-queue-summary {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.job-slot-pill {
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: #cfcfcf;
+    background-color: var(--surface);
+    border: 1px solid #3c3c3c;
+    border-radius: 3px;
+    padding: 0.14rem 0.45rem;
+    white-space: nowrap;
+}
+
+.job-slot-warn {
+    color: var(--warning);
+}
+
+.slot-queued-tag {
+    display: inline-block;
+    margin-left: 0.3rem;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.05rem 0.28rem;
+    border-radius: 3px;
+    background-color: rgba(220, 220, 170, 0.14);
+    border: 1px solid rgba(220, 220, 170, 0.35);
+    color: var(--warning);
+    vertical-align: middle;
+}
+
+/* ============================================================================
+   JOB QUEUE DEPENDENCY DIAGRAM POP-UP MODAL
+   ============================================================================ */
+
+.job-diagram-backdrop {
+    position: fixed;
+    top: 31px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    background-color: rgba(10, 10, 12, 0.78);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    box-sizing: border-box;
+}
+
+.job-diagram-backdrop-hit {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: default;
+}
+
+.job-diagram-modal {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    max-width: 1720px;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+    border: 1px solid #3c3c40;
+    border-radius: 8px;
+    box-shadow: 0 22px 64px rgba(0, 0, 0, 0.75);
+    overflow: hidden;
+}
+
+.job-diagram-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.7rem 1rem;
+    background-color: var(--bg-darker);
+    border-bottom: 1px solid #2e2e32;
+    flex-shrink: 0;
+}
+
+.job-diagram-modal-title {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.job-diagram-modal-title h3 {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.diagram-close-btn {
+    flex-shrink: 0;
+}
+
+.job-diagram-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #1c1c1e;
+    border-bottom: 1px solid #2b2b2e;
+    flex-shrink: 0;
+}
+
+.job-diagram-legend {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.job-diagram-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.diagram-hint {
+    font-size: 0.78rem;
+    color: #9a9a9a;
+}
+
+.diagram-hint strong {
+    color: #e8e8e8;
+}
+
+.diagram-legend-pill {
+    font-size: 0.69rem;
+    font-weight: 600;
+    padding: 0.12rem 0.45rem;
+    border-radius: 3px;
+}
+
+.diagram-legend-pill.upstream {
+    background-color: rgba(220, 220, 170, 0.15);
+    color: var(--warning);
+    border: 1px solid rgba(220, 220, 170, 0.38);
+}
+
+.diagram-legend-pill.downstream {
+    background-color: rgba(78, 201, 176, 0.15);
+    color: #4ec9b0;
+    border: 1px solid rgba(78, 201, 176, 0.38);
+}
+
+.job-diagram-zoom {
+    display: inline-flex;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.job-diagram-zoom .scope-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.job-diagram-viewport {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: auto;
+    cursor: grab;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.job-diagram-viewport.panning {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.job-diagram-viewport::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.job-diagram-viewport::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+
+.job-diagram-viewport::-webkit-scrollbar-thumb {
+    background: #3e3e42;
+    border-radius: 5px;
+}
+
+.job-diagram-sizer {
+    position: relative;
+    flex-shrink: 0;
+    margin: auto 0;
+}
+
+.job-diagram-canvas {
+    position: relative;
+    transform-origin: top left;
+}
+
+.job-diagram-step-band {
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.job-diagram-col-header {
+    position: absolute;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px dashed #36363c;
+    box-sizing: border-box;
+}
+
+.job-diagram-col-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.job-diagram-col-time {
+    font-size: 0.78rem;
+}
+
+.job-diagram-col-time.slot-warn {
+    color: var(--warning);
+}
+
+.job-diagram-col-label {
+    font-size: 0.76rem;
+    color: #a8a8a8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.job-diagram-edges {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.job-diagram-edges.base {
+    z-index: 1;
+}
+
+.job-diagram-edges.active {
+    z-index: 4;
+}
+
+.job-diagram-edge {
+    fill: none;
+    stroke: #5b6474;
+    stroke-width: 1.8;
+    opacity: 0.68;
+    transition: opacity 0.14s ease, stroke 0.14s ease, stroke-width 0.14s ease;
+}
+
+.job-diagram-edge.jump {
+    stroke-dasharray: 6 4;
+}
+
+.job-diagram-edge.upstream {
+    stroke: var(--warning);
+    stroke-width: 2.5;
+    stroke-dasharray: none;
+    opacity: 0.95;
+}
+
+.job-diagram-edge.downstream {
+    stroke: #4ec9b0;
+    stroke-width: 2.5;
+    stroke-dasharray: none;
+    opacity: 0.95;
+}
+
+.job-diagram-edge.dimmed {
+    opacity: 0.14;
+}
+
+.job-diagram-node {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.3rem;
+    padding: 0.55rem 0.72rem;
+    box-sizing: border-box;
+    text-align: left;
+    font-family: inherit;
+    color: #e6e6e6;
+    background-color: var(--bg-darker);
+    border: 1px solid #38383e;
+    border-left-width: 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.38);
+    transition: border-color 0.14s ease, opacity 0.14s ease, box-shadow 0.14s ease, background-color 0.14s ease;
+}
+
+.job-diagram-node.mfg {
+    border-left-color: #4ec9b0;
+}
+
+.job-diagram-node.rxn {
+    border-left-color: var(--warning);
+}
+
+.job-diagram-node:hover {
+    background-color: var(--surface);
+    border-color: #569cd6;
+}
+
+.job-diagram-node.focused {
+    background-color: var(--surface-hover);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.job-diagram-node.upstream {
+    border-color: rgba(220, 220, 170, 0.78);
+    box-shadow: 0 0 0 1px rgba(220, 220, 170, 0.38);
+}
+
+.job-diagram-node.downstream {
+    border-color: rgba(78, 201, 176, 0.78);
+    box-shadow: 0 0 0 1px rgba(78, 201, 176, 0.38);
+}
+
+.job-diagram-node.dimmed {
+    opacity: 0.25;
+}
+
+.diagram-node-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     min-width: 0;
+}
+
+.diagram-node-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.diagram-node-name {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #f4f4f4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.diagram-node-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.diagram-node-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.diagram-node-cost {
+    color: #c2c2c2;
+}
+
+.diagram-node-final {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #4ec9b0;
 }
 
 .num {

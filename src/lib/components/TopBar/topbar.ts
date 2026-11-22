@@ -1,5 +1,5 @@
 import { goto } from '$app/navigation';
-import { activeCharacterId } from '$lib/stores/global';
+import { activeCharacterId } from '#lib/stores/global';
 
 export function addCharacter() {
     goto('/login').catch(console.error);

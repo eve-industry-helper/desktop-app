@@ -1,4 +1,4 @@
-import type { IndustrySkillDef, SkillGroup } from '$lib/types/frontend';
+import type { IndustrySkillDef, SkillGroup } from '#lib/types/frontend';
 
 export const SKILL_GROUP_ORDER: SkillGroup[] = [
     'Production',

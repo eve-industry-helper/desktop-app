@@ -1,22 +1,22 @@
 import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
-import { activeCharacterId } from '$lib/stores/global';
-import type { AssetLocationOption } from '$lib/types/backend';
-import { parseEftFit } from '$lib/utils/eftParser';
+import { activeCharacterId } from '#lib/stores/global';
+import type { AssetLocationOption } from '#lib/types/backend';
+import { parseEftFit } from '#lib/utils/eftParser';
 import {
     AVAILABLE_SERVICES,
     KNOWN_STRUCTURE_TYPES,
     SECURITY_STATUSES,
     STRUCTURE_META,
     STRUCTURE_TYPES
-} from '$lib/data/structures';
-import { UPWELL_RIGS } from '$lib/data/upwellRigs';
-import { MARKET_HUBS, PRICE_BASIS_OPTIONS, PRICE_PROVIDERS } from '$lib/data/market';
+} from '#lib/data/structures';
+import { UPWELL_RIGS } from '#lib/data/upwellRigs';
+import { MARKET_HUBS, PRICE_BASIS_OPTIONS, PRICE_PROVIDERS } from '#lib/data/market';
 import {
     importStructuresFromFile,
     saveStructure,
     updatePriceSettings
-} from '$lib/stores/industrySettings';
+} from '#lib/stores/industrySettings';
 import type {
     IndustrySkillDisplay,
     IndustryStructure,
@@ -24,7 +24,7 @@ import type {
     PriceProvider,
     SecurityStatus,
     StructureType
-} from '$lib/types/frontend';
+} from '#lib/types/frontend';
 
 export {
     AVAILABLE_SERVICES,

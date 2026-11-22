@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {deleteStructure, structuresList} from '$lib/stores/industrySettings';
+    import {deleteStructure, structuresList} from '#lib/stores/industrySettings';
     import {
         applyEftFit,
         assetLocations,
@@ -22,7 +22,7 @@
         structureForm,
         toggleService
     } from '../settings';
-    import {activeCharacterId} from '$lib/stores/global';
+    import {activeCharacterId} from '#lib/stores/global';
 
     let openShareMenuId: string | null = null;
 

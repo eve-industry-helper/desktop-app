@@ -2,11 +2,11 @@
     import { onMount } from 'svelte';
     import type { Snippet } from 'svelte';
     import '../app.css';
-    import TitleBar from '$lib/components/TitleBar/titlebar.svelte';
-    import TopBar from '$lib/components/TopBar/topbar.svelte';
-    import SideBar from '$lib/components/SideBar/sidebar.svelte';
+    import TitleBar from '#lib/components/TitleBar/titlebar.svelte';
+    import TopBar from '#lib/components/TopBar/topbar.svelte';
+    import SideBar from '#lib/components/SideBar/sidebar.svelte';
     import { page } from '$app/state';
-    import { activeCharacterId, initializeApp } from '$lib/stores/global';
+    import { activeCharacterId, initializeApp } from '#lib/stores/global';
 
     let { children }: { children: Snippet } = $props();
 
