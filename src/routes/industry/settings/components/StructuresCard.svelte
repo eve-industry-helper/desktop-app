@@ -242,13 +242,13 @@
                     <button type="button" class="secondary-btn small" on:click={() => openEditStructure(s)}>
                         Edit
                     </button>
-                    <div class="share-menu-wrapper" on:click|stopPropagation>
+                    <div class="share-menu-wrapper">
                         <button
                                 type="button"
                                 class="secondary-btn small"
                                 aria-haspopup="menu"
                                 aria-expanded={openShareMenuId === s.id}
-                                on:click={() => toggleShareMenu(s.id)}
+                                on:click|stopPropagation={() => toggleShareMenu(s.id)}
                         >
                             Share ▾
                         </button>

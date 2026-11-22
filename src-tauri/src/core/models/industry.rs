@@ -1,6 +1,19 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+fn default_me() -> u8 {
+    10
+}
+fn default_te() -> u8 {
+    20
+}
+fn default_one() -> u64 {
+    1
+}
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterSkillCache {
@@ -32,6 +45,67 @@ pub struct PlanMaterial {
 #[serde(rename_all = "camelCase")]
 pub struct RawMaterial {
     pub material_type_id: u32,
+    pub quantity: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DecisionOverride {
+    #[default]
+    Auto,
+    Buy,
+    Craft,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildConfig {
+    #[serde(default)]
+    pub manufacturing_structure_id: Option<String>,
+    #[serde(default)]
+    pub reaction_structure_id: Option<String>,
+    #[serde(default)]
+    pub reprocessing_structure_id: Option<String>,
+    #[serde(default = "default_me")]
+    pub default_me: u8,
+    #[serde(default = "default_te")]
+    pub default_te: u8,
+    #[serde(default = "default_one")]
+    pub quantity: u64,
+    #[serde(default = "default_true")]
+    pub use_character_assets: bool,
+    #[serde(default = "default_true")]
+    pub enable_reprocessing_lp: bool,
+    #[serde(default)]
+    pub credit_surplus_minerals: bool,
+    #[serde(default)]
+    pub overrides: HashMap<u32, DecisionOverride>,
+}
+
+impl Default for BuildConfig {
+    fn default() -> Self {
+        Self {
+            manufacturing_structure_id: None,
+            reaction_structure_id: None,
+            reprocessing_structure_id: None,
+            default_me: 10,
+            default_te: 20,
+            quantity: 1,
+            use_character_assets: true,
+            enable_reprocessing_lp: true,
+            credit_surplus_minerals: false,
+            overrides: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ReservedResource {
+    pub location_id: u64,
+    pub location_name: String,
+    pub type_id: u32,
+    pub name: String,
     pub quantity: u64,
 }
 
@@ -73,6 +147,8 @@ pub struct PlanEntry {
     pub blueprints: Vec<PlanBlueprint>,
     #[serde(default)]
     pub buy_only_items: Vec<PlanBuyItem>,
+    #[serde(default)]
+    pub config: BuildConfig,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -82,9 +158,15 @@ pub struct IndustryPlan {
     pub name: String,
     #[serde(default)]
     pub entries: Vec<PlanEntry>,
+    #[serde(default)]
+    pub config: BuildConfig,
+    #[serde(default)]
+    pub validated: bool,
+    #[serde(default)]
+    pub validated_at: Option<u64>,
+    #[serde(default)]
+    pub reserved_resources: Vec<ReservedResource>,
 }
-
-// --- CCP SDE Deserialization Models ---
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]

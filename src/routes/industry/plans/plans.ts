@@ -1,20 +1,29 @@
 import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { parseEftFit } from '$lib/utils/eftParser';
-import type { UniverseIdMatch, UniverseName } from '$lib/types/backend';
+import { structuresList } from '$lib/stores/industrySettings';
 import type {
+    UniverseIdMatch,
+    UniverseName,
+    BlueprintSearchMatch
+} from '$lib/types/backend';
+import type {
+    BuildConfig,
     IndustryPlan,
+    IndustryStructure,
     PlanBlueprint,
     PlanBuyItem,
     PlanEntry,
     PlanEntryKind,
-    RawMaterial
+    RawMaterial,
+    ReservedResource,
 } from '$lib/types/frontend';
 
 // Core state
 export const industryPlans = writable<IndustryPlan[]>([]);
 export const selectedPlanId = writable<string | null>(null);
 export const selectedEntryId = writable<string | null>(null);
+export const validationVersion = writable<number>(0);
 
 // UI state: creating a plan
 export const isCreatingPlan = writable<boolean>(false);
@@ -30,15 +39,64 @@ export const singleItemRuns = writable<number>(1);
 export const isResolving = writable<boolean>(false);
 export const industryError = writable<string>('');
 
+export const blueprintSuggestions = writable<BlueprintSearchMatch[]>([]);
+export const selectedBlueprintMatch = writable<BlueprintSearchMatch | null>(null);
+
 export const selectedPlan = derived(
     [industryPlans, selectedPlanId],
-    ([$plans, $planId]) => $plans.find(p => p.id === $planId) ?? null
+    ([$plans,$planId]) => $plans.find(p => p.id ===$planId) ?? null
 );
 
 export const selectedEntry = derived(
     [selectedPlan, selectedEntryId],
-    ([$plan, $entryId]) => $plan?.entries.find(e => e.id === $entryId) ?? null
+    ([$plan,$entryId]) => $plan?.entries.find(e => e.id === $entryId) ?? null
 );
+
+function pickInitialStructures(structures: IndustryStructure[]) {
+    const mfg =
+        structures.find(s => s.services.includes('Manufacturing')) ??
+        structures.find(s => ['sotiyo', 'azbel', 'raitaru'].includes(s.structureType)) ??
+        structures[0];
+
+    const refinery =
+        structures.find(s => s.services.includes('Reprocessing') || s.services.includes('Reactions')) ??
+        structures.find(s => ['tatara', 'athanor'].includes(s.structureType));
+
+    return {
+        manufacturingStructureId: mfg?.id ?? null,
+        reactionStructureId: refinery?.id ?? null,
+        reprocessingStructureId: refinery?.id ?? null
+    };
+}
+
+export function ensureBuildConfig(cfg?: Partial<BuildConfig> | null): BuildConfig {
+    return {
+        manufacturingStructureId: cfg?.manufacturingStructureId ?? null,
+        reactionStructureId: cfg?.reactionStructureId ?? null,
+        reprocessingStructureId: cfg?.reprocessingStructureId ?? null,
+        defaultMe: cfg?.defaultMe ?? 10,
+        defaultTe: cfg?.defaultTe ?? 20,
+        quantity: Math.max(1, Math.floor(Number(cfg?.quantity) || 1)),
+        useCharacterAssets: cfg?.useCharacterAssets ?? true,
+        enableReprocessingLp: cfg?.enableReprocessingLp ?? true,
+        creditSurplusMinerals: cfg?.creditSurplusMinerals ?? false,
+        overrides: cfg?.overrides ? { ...cfg.overrides } : {}
+    };
+}
+
+function normalizePlan(plan: IndustryPlan): IndustryPlan {
+    return {
+        ...plan,
+        config: ensureBuildConfig(plan.config),
+        validated: Boolean(plan.validated),
+        validatedAt: plan.validatedAt ?? null,
+        reservedResources: Array.isArray(plan.reservedResources) ? plan.reservedResources : [],
+        entries: (plan.entries ?? []).map(entry => ({
+            ...entry,
+            config: ensureBuildConfig(entry.config)
+        }))
+    };
+}
 
 let hasLoadedPlans = false;
 
@@ -47,7 +105,7 @@ export async function loadPlans() {
 
     try {
         const saved: IndustryPlan[] = await invoke('load_plans');
-        industryPlans.set(saved);
+        industryPlans.set(saved.map(normalizePlan));
         hasLoadedPlans = true;
     } catch (error) {
         console.error('Failed to load plans:', error);
@@ -62,6 +120,138 @@ async function persistPlans(plans: IndustryPlan[]) {
         console.error('Failed to save plans:', error);
         industryError.set(`Failed to save plans: ${error}`);
     }
+}
+
+// --- Plan & Entry Config Persistence ---
+
+export async function updateEntryConfig(
+    planId: string,
+    entryId: string,
+    patch: Partial<BuildConfig>
+) {
+    let updatedPlans: IndustryPlan[] = [];
+    industryPlans.update(plans => {
+        updatedPlans = plans.map(plan => {
+            if (plan.id !== planId) return plan;
+            return {
+                ...plan,
+                entries: plan.entries.map(entry => {
+                    if (entry.id !== entryId) return entry;
+                    return {
+                        ...entry,
+                        config: ensureBuildConfig({ ...ensureBuildConfig(entry.config), ...patch })
+                    };
+                })
+            };
+        });
+        return updatedPlans;
+    });
+
+    await persistPlans(updatedPlans);
+}
+
+export async function updatePlanConfig(planId: string, patch: Partial<BuildConfig>) {
+    let updatedPlans: IndustryPlan[] = [];
+    industryPlans.update(plans => {
+        updatedPlans = plans.map(plan => {
+            if (plan.id !== planId) return plan;
+            return {
+                ...plan,
+                config: ensureBuildConfig({ ...ensureBuildConfig(plan.config), ...patch }),
+                entries: plan.entries.map(entry => ({
+                    ...entry,
+                    config: ensureBuildConfig({ ...ensureBuildConfig(entry.config), ...patch })
+                }))
+            };
+        });
+        return updatedPlans;
+    });
+
+    await persistPlans(updatedPlans);
+}
+
+export async function setPlanOverride(
+    planId: string,
+    typeId: number,
+    override: BuildConfig['overrides'][number]
+) {
+    const applyToOverrides = (current: BuildConfig['overrides']) => {
+        const next = { ...current };
+        if (override === 'auto') {
+            delete next[typeId];
+        } else {
+            next[typeId] = override;
+        }
+        return next;
+    };
+
+    let updatedPlans: IndustryPlan[] = [];
+    industryPlans.update(plans => {
+        updatedPlans = plans.map(plan => {
+            if (plan.id !== planId) return plan;
+            const planCfg = ensureBuildConfig(plan.config);
+            return {
+                ...plan,
+                config: { ...planCfg, overrides: applyToOverrides(planCfg.overrides) },
+                entries: plan.entries.map(entry => {
+                    const entryCfg = ensureBuildConfig(entry.config);
+                    return {
+                        ...entry,
+                        config: { ...entryCfg, overrides: applyToOverrides(entryCfg.overrides) }
+                    };
+                })
+            };
+        });
+        return updatedPlans;
+    });
+
+    await persistPlans(updatedPlans);
+}
+
+export async function clearPlanOverrides(planId: string) {
+    let updatedPlans: IndustryPlan[] = [];
+    industryPlans.update(plans => {
+        updatedPlans = plans.map(plan => {
+            if (plan.id !== planId) return plan;
+            return {
+                ...plan,
+                config: { ...ensureBuildConfig(plan.config), overrides: {} },
+                entries: plan.entries.map(entry => ({
+                    ...entry,
+                    config: { ...ensureBuildConfig(entry.config), overrides: {} }
+                }))
+            };
+        });
+        return updatedPlans;
+    });
+
+    await persistPlans(updatedPlans);
+}
+
+export async function setPlanValidation(
+    planId: string,
+    validated: boolean,
+    reservedResources: ReservedResource[]
+) {
+    const validatedAt = validated ? Math.floor(Date.now() / 1000) : null;
+
+    let updatedPlans: IndustryPlan[] = [];
+    industryPlans.update(plans => {
+        updatedPlans = plans.map(plan =>
+            plan.id === planId
+                ? {
+                    ...plan,
+                    validated,
+                    validatedAt,
+                    reservedResources: validated ? reservedResources : []
+                }
+                : plan
+        );
+        return updatedPlans;
+    });
+
+    await persistPlans(updatedPlans);
+    validationVersion.update(v => v + 1);
 }
 
 // --- Plan Actions ---
@@ -81,10 +271,15 @@ export async function createEmptyPlan() {
     const name = get(newPlanName).trim();
     if (!name) return;
 
+    const defaults = pickInitialStructures(get(structuresList));
     const newPlan: IndustryPlan = {
         id: crypto.randomUUID(),
         name,
-        entries: []
+        entries: [],
+        config: ensureBuildConfig(defaults),
+        validated: false,
+        validatedAt: null,
+        reservedResources: []
     };
 
     let updatedPlans: IndustryPlan[] = [];
@@ -110,8 +305,12 @@ export function selectPlan(planId: string) {
 }
 
 export async function removePlan(planId: string) {
+    let wasValidated = false;
     let updatedPlans: IndustryPlan[] = [];
+
     industryPlans.update(plans => {
+        const target = plans.find(p => p.id === planId);
+        wasValidated = Boolean(target?.validated);
         updatedPlans = plans.filter(p => p.id !== planId);
         return updatedPlans;
     });
@@ -123,20 +322,32 @@ export async function removePlan(planId: string) {
     }
 
     await persistPlans(updatedPlans);
+    if (wasValidated) {
+        validationVersion.update(v => v + 1);
+    }
 }
 
 // --- Entry Actions ---
 
 export function openAddEntry(mode: PlanEntryKind = 'fit') {
+    const plan = get(selectedPlan);
+    if (plan?.validated) return;
+
     isAddingEntry.set(true);
     addEntryMode.set(mode);
     selectedEntryId.set(null);
     industryError.set('');
+
+    blueprintSuggestions.set([]);
+    selectedBlueprintMatch.set(null);
 }
 
 export function cancelAddEntry() {
     isAddingEntry.set(false);
     industryError.set('');
+
+    blueprintSuggestions.set([]);
+    selectedBlueprintMatch.set(null);
 }
 
 export function selectEntry(entryId: string) {
@@ -146,13 +357,13 @@ export function selectEntry(entryId: string) {
 }
 
 export async function removeEntry(entryId: string) {
-    const planId = get(selectedPlanId);
-    if (!planId) return;
+    const plan = get(selectedPlan);
+    if (!plan || plan.validated) return;
 
     let updatedPlans: IndustryPlan[] = [];
     industryPlans.update(plans => {
         updatedPlans = plans.map(p =>
-            p.id === planId
+            p.id === plan.id
                 ? { ...p, entries: p.entries.filter(e => e.id !== entryId) }
                 : p
         );
@@ -202,19 +413,30 @@ async function attachMaterials(blueprints: PlanBlueprint[]): Promise<void> {
     }
 }
 
-async function appendEntryToSelectedPlan(entry: PlanEntry) {
-    const planId = get(selectedPlanId);
-    if (!planId) return;
+async function appendEntryToSelectedPlan(entry: Omit<PlanEntry, 'config'>) {
+    const plan = get(selectedPlan);
+    if (!plan || plan.validated) return;
+
+    // Inherit facility/ME/TE/toggles from the parent plan, starting at quantity 1
+    const baseCfg = ensureBuildConfig(plan.config);
+    const entryWithConfig: PlanEntry = {
+        ...entry,
+        config: {
+            ...baseCfg,
+            quantity: 1,
+            overrides: {}
+        }
+    };
 
     let updatedPlans: IndustryPlan[] = [];
     industryPlans.update(plans => {
         updatedPlans = plans.map(p =>
-            p.id === planId ? { ...p, entries: [...p.entries, entry] } : p
+            p.id === plan.id ? { ...p, entries: [...p.entries, entryWithConfig] } : p
         );
         return updatedPlans;
     });
 
-    selectedEntryId.set(entry.id);
+    selectedEntryId.set(entryWithConfig.id);
     isAddingEntry.set(false);
     await persistPlans(updatedPlans);
 }
@@ -245,7 +467,24 @@ async function addFitEntry() {
         const namesToResolve = new Set<string>();
         items.forEach(item => {
             namesToResolve.add(item.name);
-            namesToResolve.add(`${item.name} Blueprint`); });  const resolved: UniverseIdMatch[] = await invoke('resolve_eve_ids', { names: Array.from(namesToResolve) });  const idByName = new Map<string, number>(); resolved.forEach(entry => idByName.set(entry.name.toLowerCase(), entry.id));  const blueprints: PlanBlueprint[] = []; const buyOnlyItems: PlanBuyItem[] = [];  for (const item of items) { const itemTypeId = idByName.get(item.name.toLowerCase()); if (!itemTypeId) continue;  const bpName = `${item.name} Blueprint`;
+            namesToResolve.add(`${item.name} Blueprint`);
+        });
+
+        const resolved: UniverseIdMatch[] = await invoke('resolve_eve_ids', {
+            names: Array.from(namesToResolve)
+        });
+
+        const idByName = new Map<string, number>();
+        resolved.forEach(entry => idByName.set(entry.name.toLowerCase(), entry.id));
+
+        const blueprints: PlanBlueprint[] = [];
+        const buyOnlyItems: PlanBuyItem[] = [];
+
+        for (const item of items) {
+            const itemTypeId = idByName.get(item.name.toLowerCase());
+            if (!itemTypeId) continue;
+
+            const bpName = `${item.name} Blueprint`;
             const bpTypeId = idByName.get(bpName.toLowerCase());
 
             if (bpTypeId) {
@@ -295,21 +534,40 @@ async function addSingleEntry(kind: 'blueprint' | 'reaction') {
     const runs = Math.max(1, Number(get(singleItemRuns)) || 1);
     if (!input) return;
 
-    const suffix = kind === 'reaction' ? 'Reaction Formula' : 'Blueprint';
-    const baseName = input.replace(new RegExp(`\\s+${suffix}$`, 'i'), '').trim();
-    const bpFullName = `${baseName}${suffix}`;
+    const picked = get(selectedBlueprintMatch);
+    const expectedActivity = kind === 'reaction' ? 'reaction' : 'manufacturing';
 
     isResolving.set(true);
     try {
-        const resolved: UniverseIdMatch[] = await invoke('resolve_eve_ids', {
-            names: [baseName, bpFullName]
-        });
+        let bpTypeId: number | undefined;
+        let itemTypeId: number | undefined;
+        let bpFullName: string;
+        let baseName: string;
 
-        const idByName = new Map<string, number>();
-        resolved.forEach(entry => idByName.set(entry.name.toLowerCase(), entry.id));
+        if (
+            picked &&
+            picked.activity === expectedActivity &&
+            picked.blueprintName.toLowerCase() === input.toLowerCase()
+        ) {
+            bpTypeId = picked.blueprintTypeId;
+            itemTypeId = picked.productTypeId;
+            bpFullName = picked.blueprintName;
+            baseName = picked.productName;
+        } else {
+            const suffix = kind === 'reaction' ? 'Reaction Formula' : 'Blueprint';
+            baseName = input.replace(new RegExp(`\\s+${suffix}$`, 'i'), '').trim();
+            bpFullName = `${baseName} ${suffix}`;
 
-        const bpTypeId = idByName.get(bpFullName.toLowerCase());
-        const itemTypeId = idByName.get(baseName.toLowerCase()) ?? bpTypeId;
+            const resolved: UniverseIdMatch[] = await invoke('resolve_eve_ids', {
+                names: [baseName, bpFullName]
+            });
+
+            const idByName = new Map<string, number>();
+            resolved.forEach(entry => idByName.set(entry.name.toLowerCase(), entry.id));
+
+            bpTypeId = idByName.get(bpFullName.toLowerCase());
+            itemTypeId = idByName.get(baseName.toLowerCase()) ?? bpTypeId;
+        }
 
         if (!bpTypeId || !itemTypeId) {
             industryError.set(`Could not find "${bpFullName}" in EVE.`);
@@ -337,10 +595,48 @@ async function addSingleEntry(kind: 'blueprint' | 'reaction') {
 
         singleItemName.set('');
         singleItemRuns.set(1);
+        selectedBlueprintMatch.set(null);
+        blueprintSuggestions.set([]);
     } catch (error) {
         console.error(`Failed to add ${kind}:`, error);
         industryError.set(String(error));
     } finally {
         isResolving.set(false);
     }
+}
+
+let searchSeq = 0;
+
+export async function searchBlueprints(query: string, kind: PlanEntryKind) {
+    selectedBlueprintMatch.set(null);
+    const trimmed = query.trim();
+    if (trimmed.length < 2 || kind === 'fit') {
+        blueprintSuggestions.set([]);
+        return;
+    }
+
+    const seq = ++searchSeq;
+    try {
+        const matches = await invoke<BlueprintSearchMatch[]>('search_sde_blueprints', {
+            query: trimmed,
+            kind,
+            limit: 15
+        });
+        if (seq === searchSeq) {
+            blueprintSuggestions.set(matches);
+        }
+    } catch (error) {
+        console.error('Blueprint search failed:', error);
+    }
+}
+
+export function pickBlueprintSuggestion(match: BlueprintSearchMatch) {
+    singleItemName.set(match.blueprintName);
+    selectedBlueprintMatch.set(match);
+    blueprintSuggestions.set([]);
+}
+
+export function clearBlueprintSuggestions() {
+    searchSeq++;
+    blueprintSuggestions.set([]);
 }

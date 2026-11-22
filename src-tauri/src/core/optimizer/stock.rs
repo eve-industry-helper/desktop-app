@@ -29,8 +29,50 @@ pub struct AssetLocationOption {
 
 #[derive(Debug, Default)]
 pub struct StockInventory {
-    pub local: HashMap<u32, u64>,
-    pub haulable: HashMap<u32, Vec<HaulableStockEntry>>,
+    /// Unreserved stock keyed by location_id -> (type_id -> quantity)
+    pub by_location: HashMap<u64, HashMap<u32, u64>>,
+    /// Human-readable names for locations
+    pub location_names: HashMap<u64, String>,
+    /// Quantities withheld because other validated plans reserved them (type_id -> quantity)
+    pub reserved_elsewhere: HashMap<u32, u64>,
+}
+
+pub fn haulable_map_from(
+    by_location: &HashMap<u64, HashMap<u32, u64>>,
+    location_names: &HashMap<u64, String>,
+    excluded_location: Option<u64>,
+) -> HashMap<u32, Vec<HaulableStockEntry>> {
+    let mut by_type: HashMap<u32, Vec<HaulableStockEntry>> = HashMap::new();
+
+    for (&loc_id, items) in by_location {
+        if excluded_location == Some(loc_id) {
+            continue;
+        }
+        let loc_name = location_names
+            .get(&loc_id)
+            .cloned()
+            .unwrap_or_else(|| format!("Location {}", loc_id));
+
+        for (&type_id, &quantity) in items {
+            if quantity == 0 {
+                continue;
+            }
+            by_type
+                .entry(type_id)
+                .or_default()
+                .push(HaulableStockEntry {
+                    location_id: loc_id,
+                    location_name: loc_name.clone(),
+                    quantity,
+                });
+        }
+    }
+
+    for entries in by_type.values_mut() {
+        entries.sort_by_key(|a| std::cmp::Reverse(a.quantity));
+    }
+
+    by_type
 }
 
 fn unix_now() -> u64 {
@@ -95,16 +137,93 @@ pub async fn fetch_cached_character_assets(
     Ok(assets)
 }
 
+async fn resolve_location_names(
+    app: &AppHandle,
+    state: &AppState,
+    character_id: u32,
+    location_ids: &HashSet<u64>,
+    configured_structures: &[IndustryStructure],
+) -> HashMap<u64, String> {
+    let mut loc_names: HashMap<u64, String> = HashMap::new();
+
+    for s in configured_structures {
+        if let Some(lid) = s.location_id {
+            loc_names.insert(lid, s.name.clone());
+        }
+    }
+
+    {
+        let cached = state.structure_names_cache.lock().await;
+        for &lid in location_ids {
+            if !loc_names.contains_key(&lid)
+                && let Some(name) = cached.get(&lid)
+            {
+                loc_names.insert(lid, name.clone());
+            }
+        }
+    }
+
+    let npc_ids: Vec<u64> = location_ids
+        .iter()
+        .copied()
+        .filter(|&id| {
+            !loc_names.contains_key(&id)
+                && ((30_000_000..=39_999_999).contains(&id)
+                || (60_000_000..=64_000_000).contains(&id))
+        })
+        .collect();
+
+    if !npc_ids.is_empty() {
+        for chunk in npc_ids.chunks(500) {
+            if let Ok(res) = state
+                .http
+                .post("https://esi.evetech.net/universe/names/")
+                .json(&chunk)
+                .send()
+                .await
+                && let Ok(names) = parse_esi_response::<Vec<UniverseName>>(res).await
+            {
+                let mut cached = state.structure_names_cache.lock().await;
+                for n in names {
+                    loc_names.insert(n.id, n.name.clone());
+                    cached.insert(n.id, n.name);
+                }
+            }
+        }
+    }
+
+    let player_structure_ids: Vec<u64> = location_ids
+        .iter()
+        .copied()
+        .filter(|&id| id > MAX_INT32 && !loc_names.contains_key(&id))
+        .collect();
+
+    for sid in player_structure_ids {
+        let url = format!(
+            "https://esi.evetech.net/latest/universe/structures/{}/",
+            sid
+        );
+        let name = match esi_get_authed::<StructureInfo>(app, state, character_id, &url).await {
+            Ok(info) => info.name,
+            Err(_) => format!("Restricted Structure ({})", sid),
+        };
+        loc_names.insert(sid, name.clone());
+        let mut cached = state.structure_names_cache.lock().await;
+        cached.insert(sid, name);
+    }
+
+    loc_names
+}
+
 pub async fn build_stock_inventory(
     app: &AppHandle,
     state: &AppState,
     character_id: u32,
     assets: &[Asset],
-    selected_location_id: Option<u64>,
     configured_structures: &[IndustryStructure],
     relevant_type_ids: &HashSet<u32>,
+    reserved_by_other_plans: &HashMap<(u64, u32), u64>,
 ) -> StockInventory {
-    // Map item_id -> (parent_location_id, location_flag) to walk containers up to station/structure
     let mut parent_map: HashMap<u64, (u64, &str)> = HashMap::with_capacity(assets.len());
     for a in assets {
         let (item_id, loc_id, _, _) = normalize_asset(a);
@@ -127,113 +246,53 @@ pub async fn build_stock_inventory(
         Some(curr)
     };
 
-    let mut local: HashMap<u32, u64> = HashMap::new();
-    // type_id -> (location_id -> qty)
-    let mut remote_by_type: HashMap<u32, HashMap<u64, u64>> = HashMap::new();
-    let mut remote_locations: HashSet<u64> = HashSet::new();
-
+    let mut by_location: HashMap<u64, HashMap<u32, u64>> = HashMap::new();
     for a in assets {
         let (_, loc_id, type_id, qty) = normalize_asset(a);
         if qty == 0 || !relevant_type_ids.contains(&type_id) {
             continue;
         }
-
         let Some(root_loc) = resolve_root(loc_id, &a.location_flag) else {
             continue;
         };
-
-        if selected_location_id == Some(root_loc) {
-            *local.entry(type_id).or_insert(0) += qty;
-        } else {
-            *remote_by_type
-                .entry(type_id)
-                .or_default()
-                .entry(root_loc)
-                .or_insert(0) += qty;
-            remote_locations.insert(root_loc);
-        }
+        *by_location
+            .entry(root_loc)
+            .or_default()
+            .entry(type_id)
+            .or_insert(0) += qty;
     }
 
-    // Resolve names for remote haulable locations
-    let mut loc_names: HashMap<u64, String> = HashMap::new();
-    for s in configured_structures {
-        if let Some(lid) = s.location_id {
-            loc_names.insert(lid, s.name.clone());
+    // Deduct stock already reserved by other validated plans
+    let mut reserved_elsewhere: HashMap<u32, u64> = HashMap::new();
+    for (&(loc_id, type_id), &res_qty) in reserved_by_other_plans {
+        if res_qty == 0 {
+            continue;
         }
-    }
-
-    {
-        let cached = state.structure_names_cache.lock().await;
-        for &lid in &remote_locations {
-            if !loc_names.contains_key(&lid)
-                && let Some(name) = cached.get(&lid)
-            {
-                loc_names.insert(lid, name.clone());
+        if let Some(loc_map) = by_location.get_mut(&loc_id)
+            && let Some(avail) = loc_map.get_mut(&type_id)
+        {
+            let deducted = (*avail).min(res_qty);
+            if deducted > 0 {
+                *avail -= deducted;
+                *reserved_elsewhere.entry(type_id).or_insert(0) += deducted;
+            }
+            if *avail == 0 {
+                loc_map.remove(&type_id);
             }
         }
     }
+    by_location.retain(|_, items| !items.is_empty());
 
-    let npc_ids: Vec<u64> = remote_locations
-        .iter()
-        .copied()
-        .filter(|id| *id <= MAX_INT32 && !loc_names.contains_key(id))
-        .collect();
+    let location_ids: HashSet<u64> = by_location.keys().copied().collect();
+    let location_names =
+        resolve_location_names(app, state, character_id, &location_ids, configured_structures)
+            .await;
 
-    if !npc_ids.is_empty() {
-        for chunk in npc_ids.chunks(500) {
-            if let Ok(res) = state
-                .http
-                .post("https://esi.evetech.net/universe/names/")
-                .json(&chunk)
-                .send()
-                .await
-                && let Ok(names) = parse_esi_response::<Vec<UniverseName>>(res).await
-            {
-                for n in names {
-                    loc_names.insert(n.id, n.name);
-                }
-            }
-        }
+    StockInventory {
+        by_location,
+        location_names,
+        reserved_elsewhere,
     }
-
-    let player_structure_ids: Vec<u64> = remote_locations
-        .iter()
-        .copied()
-        .filter(|id| *id > MAX_INT32 && !loc_names.contains_key(id))
-        .collect();
-
-    for sid in player_structure_ids {
-        let url = format!(
-            "https://esi.evetech.net/latest/universe/structures/{}/",
-            sid
-        );
-        let name = match esi_get_authed::<StructureInfo>(app, state, character_id, &url).await {
-            Ok(info) => info.name,
-            Err(_) => format!("Structure {}", sid),
-        };
-        loc_names.insert(sid, name.clone());
-        let mut cached = state.structure_names_cache.lock().await;
-        cached.insert(sid, name);
-    }
-
-    let mut haulable: HashMap<u32, Vec<HaulableStockEntry>> = HashMap::new();
-    for (type_id, loc_map) in remote_by_type {
-        let mut entries: Vec<HaulableStockEntry> = loc_map
-            .into_iter()
-            .map(|(location_id, quantity)| HaulableStockEntry {
-                location_id,
-                location_name: loc_names
-                    .get(&location_id)
-                    .cloned()
-                    .unwrap_or_else(|| format!("Location {}", location_id)),
-                quantity,
-            })
-            .collect();
-        entries.sort_by_key(|a| std::cmp::Reverse(a.quantity));
-        haulable.insert(type_id, entries);
-    }
-
-    StockInventory { local, haulable }
 }
 
 pub async fn list_asset_locations(
@@ -271,65 +330,8 @@ pub async fn list_asset_locations(
         }
     }
 
-    let mut loc_names: HashMap<u64, String> = HashMap::new();
-    {
-        let cached = state.structure_names_cache.lock().await;
-        for &lid in counts.keys() {
-            if let Some(name) = cached.get(&lid) {
-                loc_names.insert(lid, name.clone());
-            }
-        }
-    }
-
-    // Only send valid NPC station / solar system IDs to /universe/names/
-    let npc_ids: Vec<u64> = counts
-        .keys()
-        .copied()
-        .filter(|&id| {
-            !loc_names.contains_key(&id)
-                && ((30_000_000..=39_999_999).contains(&id)
-                || (60_000_000..=64_000_000).contains(&id))
-        })
-        .collect();
-
-    if !npc_ids.is_empty() {
-        for chunk in npc_ids.chunks(500) {
-            if let Ok(res) = state
-                .http
-                .post("https://esi.evetech.net/universe/names/")
-                .json(&chunk)
-                .send()
-                .await
-                && let Ok(names) = parse_esi_response::<Vec<UniverseName>>(res).await
-            {
-                let mut cached = state.structure_names_cache.lock().await;
-                for n in names {
-                    loc_names.insert(n.id, n.name.clone());
-                    cached.insert(n.id, n.name);
-                }
-            }
-        }
-    }
-
-    let player_structure_ids: Vec<u64> = counts
-        .keys()
-        .copied()
-        .filter(|&id| id > MAX_INT32 && !loc_names.contains_key(&id))
-        .collect();
-
-    for sid in player_structure_ids {
-        let url = format!(
-            "https://esi.evetech.net/latest/universe/structures/{}/",
-            sid
-        );
-        let name = match esi_get_authed::<StructureInfo>(app, state, character_id, &url).await {
-            Ok(info) => info.name,
-            Err(_) => format!("Restricted Structure ({})", sid),
-        };
-        loc_names.insert(sid, name.clone());
-        let mut cached = state.structure_names_cache.lock().await;
-        cached.insert(sid, name);
-    }
+    let location_ids: HashSet<u64> = counts.keys().copied().collect();
+    let loc_names = resolve_location_names(app, state, character_id, &location_ids, &[]).await;
 
     let mut locations: Vec<AssetLocationOption> = counts
         .into_iter()

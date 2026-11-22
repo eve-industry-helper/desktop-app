@@ -37,12 +37,17 @@ export interface PlanEntry {
     kind: PlanEntryKind;
     blueprints: PlanBlueprint[];
     buyOnlyItems: PlanBuyItem[];
+    config?: BuildConfig;
 }
 
 export interface IndustryPlan {
     id: string;
     name: string;
     entries: PlanEntry[];
+    config?: BuildConfig;
+    validated?: boolean;
+    validatedAt?: number | null;
+    reservedResources?: ReservedResource[];
 }
 
 export type SkillGroup =
@@ -157,4 +162,27 @@ export interface IndustrySettings {
     characterSkills: Record<number, CharacterSkillCache>;
     structures: IndustryStructure[];
     pricing: PriceSettings;
+}
+
+export type DecisionOverride = 'auto' | 'buy' | 'craft';
+
+export interface BuildConfig {
+    manufacturingStructureId: string | null;
+    reactionStructureId: string | null;
+    reprocessingStructureId: string | null;
+    defaultMe: number;
+    defaultTe: number;
+    quantity: number;
+    useCharacterAssets: boolean;
+    enableReprocessingLp: boolean;
+    creditSurplusMinerals: boolean;
+    overrides: Record<number, DecisionOverride>;
+}
+
+export interface ReservedResource {
+    locationId: number;
+    locationName: string;
+    typeId: number;
+    name: string;
+    quantity: number;
 }

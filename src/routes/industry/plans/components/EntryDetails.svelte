@@ -1,24 +1,27 @@
 <script lang="ts">
-    import type { IndustryPlan, PlanEntry } from '$lib/types/frontend';
+    import type { BuildConfig, IndustryPlan, PlanEntry } from '$lib/types/frontend';
     import { structuresList } from '$lib/stores/industrySettings';
-    import { removeEntry } from '../plans';
+    import { ensureBuildConfig, removeEntry, validationVersion } from '../plans';
     import {
+        activeOverrides,
         activeResultTab,
+        applyConfigChange,
         clearOverrides,
         copiedNotice,
         copyMultibuy,
-        ensureDefaultStructures,
         formatDuration,
         formatHaulableSummary,
         formatIsk,
         formatIskExact,
         isOptimizing,
+        isValidatingPlan,
         optimizationResult,
         optimizeScope,
-        optimizerConfig,
         optimizerError,
-        rerunLastOptimization,
-        runPlanOptimization
+        rerunActiveOptimization,
+        runPlanOptimization,
+        unvalidatePlan,
+        validatePlan
     } from './optimizer';
     import OptimizerTreeNode from './OptimizerTreeNode.svelte';
     import ReprocessingPanel from './ReprocessingPanel.svelte';
@@ -26,27 +29,115 @@
     export let entry: PlanEntry;
     export let plan: IndustryPlan;
 
+    const MIXED = '__mixed__';
     let lastTriggerKey = '';
 
-    $: targetEntries = $optimizeScope === 'plan' ? plan.entries : [entry];
-    $: overrideCount = Object.keys($optimizerConfig.overrides).length;
-
-    $: triggerKey = `${$optimizeScope}:${$optimizeScope === 'plan' ? plan.id : entry.id}:${targetEntries.length}`;
-    $: if (triggerKey !== lastTriggerKey) {
-        lastTriggerKey = triggerKey;
-        ensureDefaultStructures();
-        runPlanOptimization(targetEntries);
+    function sharedValue<T>(
+        configs: BuildConfig[],
+        pick: (c: BuildConfig) => T
+    ): T | typeof MIXED {
+        if (configs.length === 0) return MIXED;
+        const first = pick(configs[0]);
+        return configs.every(c => pick(c) === first) ? first : MIXED;
     }
 
-    $: optResult =$optimizationResult;
+    $: optResult = $optimizationResult;
+    $: entryConfig = ensureBuildConfig(entry.config);
+    $: scopeConfigs =
+        $optimizeScope === 'plan'
+            ? plan.entries.map(e => ensureBuildConfig(e.config))
+            : [entryConfig];
+
+    $: mfgDisplay = sharedValue(scopeConfigs, c => c.manufacturingStructureId ?? '');
+    $: refDisplay = sharedValue(scopeConfigs, c => c.reprocessingStructureId ?? '');
+    $: meDisplay = sharedValue(scopeConfigs, c => c.defaultMe);
+    $: teDisplay = sharedValue(scopeConfigs, c => c.defaultTe);
+    $: qtyDisplay = sharedValue(scopeConfigs, c => c.quantity);
+    $: assetsDisplay = sharedValue(scopeConfigs, c => c.useCharacterAssets);
+    $: reprocessingDisplay = sharedValue(scopeConfigs, c => c.enableReprocessingLp);
+    $: surplusDisplay = sharedValue(scopeConfigs, c => c.creditSurplusMinerals);
+
+    $: isLocked = Boolean(plan.validated);
+    $: reservedList = plan.reservedResources ?? [];
+    $: overrideCount = Object.keys($activeOverrides).length;
+
+    $: triggerKey = `${$optimizeScope}:${plan.id}:${$optimizeScope === 'plan' ? plan.entries.length : entry.id}:${$validationVersion}`;
+    $: if (triggerKey !== lastTriggerKey) {
+        lastTriggerKey = triggerKey;
+        runPlanOptimization(plan, entry, $optimizeScope);
+    }
 
     function switchScope(scope: 'entry' | 'plan') {
         if ($optimizeScope === scope) return;
         optimizeScope.set(scope);
     }
 
-    function handleControlChange() {
-        runPlanOptimization(targetEntries);
+    function handleMfgChange(event: Event) {
+        const val = (event.currentTarget as HTMLSelectElement).value;
+        if (val === MIXED) return;
+        applyConfigChange({ manufacturingStructureId: val || null });
+    }
+
+    function handleRefineryChange(event: Event) {
+        const val = (event.currentTarget as HTMLSelectElement).value;
+        if (val === MIXED) return;
+        applyConfigChange({ reprocessingStructureId: val || null, reactionStructureId: val || null });
+    }
+
+    function handleMeChange(event: Event) {
+        const num = Math.max(
+            0,
+            Math.min(10, Math.floor(Number((event.currentTarget as HTMLInputElement).value) || 0))
+        );
+        applyConfigChange({ defaultMe: num });
+    }
+
+    function handleTeChange(event: Event) {
+        const num = Math.max(
+            0,
+            Math.min(20, Math.floor(Number((event.currentTarget as HTMLInputElement).value) || 0))
+        );
+        applyConfigChange({ defaultTe: num });
+    }
+
+    function handleQtyChange(event: Event) {
+        const num = Math.max(
+            1,
+            Math.floor(Number((event.currentTarget as HTMLInputElement).value) || 1)
+        );
+        applyConfigChange({ quantity: num });
+    }
+
+    function handleToggle(
+        field: 'useCharacterAssets' | 'enableReprocessingLp' | 'creditSurplusMinerals',
+        event: Event
+    ) {
+        const checked = (event.currentTarget as HTMLInputElement).checked;
+        applyConfigChange({ [field]: checked });
+    }
+
+    function selectValue(node: HTMLSelectElement, params: { value: string; count: number }) {
+        const apply = (val: string) => {
+            node.value = val;
+            queueMicrotask(() => {
+                node.value = val;
+            });
+        };
+        apply(params.value);
+        return {
+            update(next: { value: string; count: number }) {
+                apply(next.value);
+            }
+        };
+    }
+
+    function indeterminateState(node: HTMLInputElement, val: boolean) {
+        node.indeterminate = val;
+        return {
+            update(nextVal: boolean) {
+                node.indeterminate = nextVal;
+            }
+        };
     }
 </script>
 
@@ -54,15 +145,22 @@
     <div>
         <h2>
             {$optimizeScope === 'plan' ? `${plan.name} (Full Plan)` : entry.name}
+            {#if $optimizeScope === 'entry' && entryConfig.quantity > 1}
+                <span class="title-multiplier">×{entryConfig.quantity}</span>
+            {/if}
+            {#if isLocked}
+                <span class="validated-pill">VALIDATED</span>
+            {/if}
         </h2>
         <span class="subtitle">
             {#if $optimizeScope === 'plan'}
-                {plan.entries.length} entries combined
+                {plan.entries.length} entries combined · Changes overwrite all items in this plan
             {:else}
                 {entry.blueprints.length} blueprints
                 {#if entry.buyOnlyItems.length > 0}
                     · {entry.buyOnlyItems.length} buy-only
                 {/if}
+                · Controls apply to this item only
             {/if}
         </span>
     </div>
@@ -87,10 +185,32 @@
             </button>
         </div>
 
+        {#if isLocked}
+            <button
+                    type="button"
+                    class="secondary-btn small"
+                    on:click={() => unvalidatePlan(plan)}
+                    disabled={$isValidatingPlan}
+                    title="Release reserved local resources and re-enable editing"
+            >
+                {$isValidatingPlan ? 'Unlocking...' : 'Unlock Plan'}
+            </button>
+        {:else}
+            <button
+                    type="button"
+                    class="validate-btn small"
+                    on:click={() => validatePlan(plan)}
+                    disabled={$isValidatingPlan || $isOptimizing}
+                    title="Lock plan and reserve its local hangar resources against other plans"
+            >
+                {$isValidatingPlan ? 'Validating...' : 'Validate Plan'}
+            </button>
+        {/if}
+
         <button
                 type="button"
                 class="secondary-btn small"
-                on:click={() => runPlanOptimization(targetEntries, { forcePriceRefresh: true, forceAssetRefresh: true })}
+                on:click={() => rerunActiveOptimization({ forcePriceRefresh: true, forceAssetRefresh: true })}
                 disabled={$isOptimizing}
         >
             {$isOptimizing ? 'Optimizing...' : 'Refresh Prices'}
@@ -100,22 +220,56 @@
                 type="button"
                 class="remove-btn small"
                 on:click={() => removeEntry(entry.id)}
+                disabled={isLocked}
+                title={isLocked ? 'Unlock plan to remove entries' : 'Remove item from plan'}
         >
             Remove Item
         </button>
     </div>
 </div>
 
+{#if isLocked}
+    <div class="opt-alert validated-banner">
+        <div class="validated-banner-head">
+            <strong>Plan Validated & Locked</strong>
+            <span>
+                {#if reservedList.length > 0}
+                    {reservedList.length} local material stack{reservedList.length === 1 ? '' : 's'} reserved and excluded from all other plans.
+                {:else}
+                    No local hangar stock reserved (all materials sourced from market).
+                {/if}
+            </span>
+        </div>
+
+        {#if reservedList.length > 0}
+            <details class="reserved-details">
+                <summary>View reserved hangar resources ({reservedList.length})</summary>
+                <div class="reserved-chips">
+                    {#each reservedList as r (r.locationId + ':' + r.typeId)}
+                        <span class="stock-pill local">
+                            {r.name} ×{r.quantity.toLocaleString()} ({r.locationName})
+                        </span>
+                    {/each}
+                </div>
+            </details>
+        {/if}
+    </div>
+{/if}
+
 <!-- Optimizer Controls -->
-<div class="opt-controls">
+<div class="opt-controls" class:locked={isLocked}>
     <label class="field-label compact">
         <span>Manufacturing Facility</span>
         <select
                 class="text-input"
-                bind:value={$optimizerConfig.manufacturingStructureId}
-                on:change={handleControlChange}
+                use:selectValue={{ value: mfgDisplay, count: $structuresList.length }}
+                disabled={isLocked}
+                on:change={handleMfgChange}
         >
-            <option value={null}>NPC Station (Default)</option>
+            {#if mfgDisplay === MIXED}
+                <option value={MIXED} disabled>Mixed (select to overwrite all)</option>
+            {/if}
+            <option value="">NPC Station (Default)</option>
             {#each $structuresList as s (s.id)}
                 <option value={s.id}>{s.name} ({s.structureType.toUpperCase()})</option>
             {/each}
@@ -126,13 +280,14 @@
         <span>Refinery (Reactions / Reprocessing)</span>
         <select
                 class="text-input"
-                bind:value={$optimizerConfig.reprocessingStructureId}
-                on:change={() => {
-                optimizerConfig.update(c => ({ ...c, reactionStructureId: c.reprocessingStructureId }));
-                handleControlChange();
-            }}
+                use:selectValue={{ value: refDisplay, count: $structuresList.length }}
+                disabled={isLocked}
+                on:change={handleRefineryChange}
         >
-            <option value={null}>Auto / NPC 50%</option>
+            {#if refDisplay === MIXED}
+                <option value={MIXED} disabled>Mixed (select to overwrite all)</option>
+            {/if}
+            <option value="">Auto / NPC 50%</option>
             {#each $structuresList as s (s.id)}
                 <option value={s.id}>{s.name} ({s.structureType.toUpperCase()})</option>
             {/each}
@@ -146,8 +301,10 @@
                 min="0"
                 max="10"
                 class="text-input"
-                bind:value={$optimizerConfig.defaultMe}
-                on:change={handleControlChange}
+                value={meDisplay === MIXED ? '' : meDisplay}
+                placeholder={meDisplay === MIXED ? 'Mixed' : ''}
+                disabled={isLocked}
+                on:change={handleMeChange}
         />
     </label>
 
@@ -158,8 +315,10 @@
                 min="0"
                 max="20"
                 class="text-input"
-                bind:value={$optimizerConfig.defaultTe}
-                on:change={handleControlChange}
+                value={teDisplay === MIXED ? '' : teDisplay}
+                placeholder={teDisplay === MIXED ? 'Mixed' : ''}
+                disabled={isLocked}
+                on:change={handleTeChange}
         />
     </label>
 
@@ -170,8 +329,10 @@
                 min="1"
                 step="1"
                 class="text-input"
-                bind:value={$optimizerConfig.quantityMultiplier}
-                on:change={handleControlChange}
+                value={qtyDisplay === MIXED ? '' : qtyDisplay}
+                placeholder={qtyDisplay === MIXED ? 'Mixed' : ''}
+                disabled={isLocked}
+                on:change={handleQtyChange}
         />
     </label>
 
@@ -179,8 +340,10 @@
         <label class="toggle-chip">
             <input
                     type="checkbox"
-                    bind:checked={$optimizerConfig.useCharacterAssets}
-                    on:change={handleControlChange}
+                    checked={assetsDisplay === true}
+                    use:indeterminateState={assetsDisplay === MIXED}
+                    disabled={isLocked}
+                    on:change={(e) => handleToggle('useCharacterAssets', e)}
             />
             <span>Deduct Local Assets</span>
         </label>
@@ -188,18 +351,25 @@
         <label class="toggle-chip">
             <input
                     type="checkbox"
-                    bind:checked={$optimizerConfig.enableReprocessingLp}
-                    on:change={handleControlChange}
+                    checked={reprocessingDisplay === true}
+                    use:indeterminateState={reprocessingDisplay === MIXED}
+                    disabled={isLocked}
+                    on:change={(e) => handleToggle('enableReprocessingLp', e)}
             />
             <span>Reprocess Ore LP</span>
         </label>
 
-        {#if $optimizerConfig.enableReprocessingLp}
-            <label class="toggle-chip" title="Credit value of surplus byproduct minerals when evaluating ore mixes">
+        {#if reprocessingDisplay !== false}
+            <label
+                    class="toggle-chip"
+                    title="Credit value of surplus byproduct minerals when evaluating ore mixes"
+            >
                 <input
                         type="checkbox"
-                        bind:checked={$optimizerConfig.creditSurplusMinerals}
-                        on:change={handleControlChange}
+                        checked={surplusDisplay === true}
+                        use:indeterminateState={surplusDisplay === MIXED}
+                        disabled={isLocked}
+                        on:change={(e) => handleToggle('creditSurplusMinerals', e)}
                 />
                 <span>Credit Surplus</span>
             </label>
@@ -284,7 +454,7 @@
             class:active={$activeResultTab === 'shopping'}
             on:click={() => activeResultTab.set('shopping')}
     >
-        Shopping List ({$optimizationResult?.shoppingList.length ?? 0})
+        Shopping List ({optResult?.shoppingList.length ?? 0})
     </button>
     <button
             type="button"
@@ -293,7 +463,7 @@
             on:click={() => activeResultTab.set('reprocessing')}
     >
         Ore Reprocessing
-        {#if $optimizationResult?.reprocessing?.usedReprocessing}
+        {#if optResult?.reprocessing?.usedReprocessing}
             <span class="tab-dot"></span>
         {/if}
     </button>
@@ -303,7 +473,7 @@
             class:active={$activeResultTab === 'jobs'}
             on:click={() => activeResultTab.set('jobs')}
     >
-        Job Queue ({$optimizationResult?.jobQueue.length ?? 0})
+        Job Queue ({optResult?.jobQueue.length ?? 0})
     </button>
     <button
             type="button"
@@ -394,8 +564,12 @@
     {:else if optResult}
         {#if $activeResultTab === 'tree'}
             <div class="section-bar">
-                <span class="subtitle">Click any BUY / CRAFT badge to override the optimizer for that material.</span>
-                {#if overrideCount > 0}
+                <span class="subtitle">
+                    {isLocked
+                        ? 'Unlock the plan to change Buy / Craft overrides.'
+                        : 'Click any BUY / CRAFT badge to override the optimizer for that material.'}
+                </span>
+                {#if overrideCount > 0 && !isLocked}
                     <button type="button" class="secondary-btn small" on:click={clearOverrides}>
                         Reset Overrides ({overrideCount})
                     </button>
@@ -417,7 +591,7 @@
                 <button
                         type="button"
                         class="primary-btn small"
-                        on:click={() => copyMultibuy(optResult.shoppingList, 'Shopping List')}
+                        on:click={() => copyMultibuy(optResult?.shoppingList ?? [], 'Shopping List')}
                         disabled={optResult.shoppingList.length === 0}
                 >
                     Copy EVE Multibuy
@@ -520,7 +694,7 @@
         {/if}
     {:else}
         <div class="workspace-empty">
-            <button type="button" class="primary-btn" on:click={() => rerunLastOptimization()}>
+            <button type="button" class="primary-btn" on:click={() => rerunActiveOptimization()}>
                 Run Optimizer
             </button>
         </div>

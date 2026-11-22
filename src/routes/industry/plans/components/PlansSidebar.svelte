@@ -46,7 +46,17 @@
                     on:click={() => selectPlan(plan.id)}
             >
                 <span class="plan-item-name">{plan.name}</span>
-                <span class="plan-item-count">{plan.entries.length}</span>
+                <span class="plan-item-meta">
+                    {#if plan.validated}
+                        <span
+                                class="validated-pill compact"
+                                title={`${plan.reservedResources?.length ?? 0} local resource stacks reserved`}
+                        >
+                            LOCKED
+                        </span>
+                    {/if}
+                    <span class="plan-item-count">{plan.entries.length}</span>
+                </span>
             </button>
         {:else}
             <p class="sidebar-empty">No plans yet.</p>

@@ -12,15 +12,7 @@ use crate::core::optimizer::bonuses::{
     effective_buy_unit_price,
 };
 use crate::core::optimizer::stock::HaulableStockEntry;
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum DecisionOverride {
-    #[default]
-    Auto,
-    Buy,
-    Craft,
-}
+pub use crate::core::models::industry::DecisionOverride;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]

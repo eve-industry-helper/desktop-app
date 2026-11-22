@@ -9,13 +9,15 @@ use tauri::AppHandle;
 
 use crate::commands::market::{get_esi_adjusted_prices_internal, get_market_prices_internal};
 use crate::core::models::industry::{
+    BuildConfig,
+    IndustryPlan,
     IndustrySettings,
     IndustryStructure,
     PlanEntry,
     PlanEntryKind,
-    StructureType,
+    ReservedResource,
 };
-use crate::core::models::sde::BlueprintActivity;
+use crate::core::models::sde::{BlueprintActivity, SdeIndex};
 use crate::core::optimizer::bonuses::{
     effective_sell_unit_revenue,
     is_base_mineral,
@@ -25,7 +27,6 @@ use crate::core::optimizer::dag::{
     collect_reachable_types,
     evaluate_material_node,
     evaluate_root_blueprint,
-    DecisionOverride,
     EvalContext,
     NodeDecision,
     OptimizedNode,
@@ -39,6 +40,7 @@ use crate::core::optimizer::reprocess_lp::{
 use crate::core::optimizer::stock::{
     build_stock_inventory,
     fetch_cached_character_assets,
+    haulable_map_from,
     HaulableStockEntry,
     StockInventory,
 };
@@ -47,50 +49,35 @@ use crate::core::state::AppState;
 use crate::core::storage::read_json_or_default;
 
 const SETTINGS_FILE: &str = "industry_settings.json";
+const PLANS_FILE: &str = "plans.json";
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum OptimizeScope {
+    #[default]
+    Entry,
+    Plan,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OptimizePlanRequest {
     pub character_id: Option<u32>,
-    pub entries: Vec<PlanEntry>,
-    pub manufacturing_structure_id: Option<String>,
-    pub reaction_structure_id: Option<String>,
-    pub reprocessing_structure_id: Option<String>,
     #[serde(default)]
-    pub overrides: HashMap<u32, DecisionOverride>,
+    pub plan_id: Option<String>,
+    #[serde(default)]
+    pub scope: OptimizeScope,
+    #[serde(default)]
+    pub plan_config: BuildConfig,
+    pub entries: Vec<PlanEntry>,
     #[serde(default)]
     pub bp_me_overrides: HashMap<u32, u8>,
     #[serde(default)]
     pub bp_te_overrides: HashMap<u32, u8>,
-    #[serde(default = "default_me")]
-    pub default_me: u8,
-    #[serde(default = "default_te")]
-    pub default_te: u8,
-    #[serde(default = "default_one")]
-    pub quantity_multiplier: u64,
-    #[serde(default = "default_true")]
-    pub use_character_assets: bool,
-    #[serde(default = "default_true")]
-    pub enable_reprocessing_lp: bool,
-    #[serde(default)]
-    pub credit_surplus_minerals: bool,
     #[serde(default)]
     pub force_price_refresh: bool,
     #[serde(default)]
     pub force_asset_refresh: bool,
-}
-
-fn default_me() -> u8 {
-    10
-}
-fn default_te() -> u8 {
-    20
-}
-fn default_true() -> bool {
-    true
-}
-fn default_one() -> u64 {
-    1
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -134,28 +121,24 @@ pub struct OptimizationResult {
     pub shopping_list: Vec<ShoppingItem>,
     pub job_queue: Vec<JobSummary>,
     pub reprocessing: Option<ReprocessingPlan>,
+    pub used_local_resources: Vec<ReservedResource>,
+    pub reserved_by_other_plans_count: usize,
     pub warnings: Vec<String>,
+}
+
+fn sde_type_name(sde: &SdeIndex, type_id: u32) -> String {
+    sde.types
+        .get(&type_id)
+        .map(|t| t.name.clone())
+        .unwrap_or_else(|| format!("Type {}", type_id))
 }
 
 fn resolve_structure<'a>(
     structures: &'a [IndustryStructure],
     id: Option<&str>,
-    fallback_refinery: bool,
 ) -> Option<&'a IndustryStructure> {
-    if let Some(target_id) = id
-        && let Some(found) = structures.iter().find(|s| s.id == target_id)
-    {
-        return Some(found);
-    }
-    if fallback_refinery {
-        return structures.iter().find(|s| {
-            matches!(
-                s.structure_type,
-                StructureType::Tatara | StructureType::Athanor
-            )
-        });
-    }
-    None
+    let target_id = id?;
+    structures.iter().find(|s| s.id == target_id)
 }
 
 fn accumulate_tree(
@@ -165,13 +148,17 @@ fn accumulate_tree(
     jobs: &mut HashMap<u32, JobSummary>,
 ) {
     if node.from_local_stock > 0 {
-        let entry = stock_totals.entry(node.type_id).or_insert((0, node.unit_buy_price));
+        let entry = stock_totals
+            .entry(node.type_id)
+            .or_insert((0, node.unit_buy_price));
         entry.0 += node.from_local_stock;
     }
 
     match node.decision {
         NodeDecision::Buy if node.net_qty > 0 => {
-            let entry = buy_totals.entry(node.type_id).or_insert((0, node.unit_buy_price));
+            let entry = buy_totals
+                .entry(node.type_id)
+                .or_insert((0, node.unit_buy_price));
             entry.0 += node.net_qty;
         }
         NodeDecision::Craft => {
@@ -206,6 +193,7 @@ pub async fn run_optimizer(
 ) -> Result<OptimizationResult, String> {
     let sde = ensure_sde_loaded(app, state).await?;
     let settings: IndustrySettings = read_json_or_default(app, SETTINGS_FILE).unwrap_or_default();
+    let saved_plans: Vec<IndustryPlan> = read_json_or_default(app, PLANS_FILE).unwrap_or_default();
     let mut warnings = Vec::new();
 
     let skills: HashMap<u32, u8> = req
@@ -214,21 +202,61 @@ pub async fn run_optimizer(
         .map(|c| c.skills.clone())
         .unwrap_or_default();
 
-    let mfg_structure = resolve_structure(
-        &settings.structures,
-        req.manufacturing_structure_id.as_deref(),
-        false,
-    );
-    let rxn_structure = resolve_structure(
-        &settings.structures,
-        req.reaction_structure_id.as_deref(),
-        true,
-    );
-    let reproc_structure = resolve_structure(
-        &settings.structures,
-        req.reprocessing_structure_id.as_deref(),
-        true,
-    );
+    let reprocessing_enabled = match req.scope {
+        OptimizeScope::Entry => req
+            .entries
+            .first()
+            .map(|e| e.config.enable_reprocessing_lp)
+            .unwrap_or(req.plan_config.enable_reprocessing_lp),
+        OptimizeScope::Plan => {
+            if req.entries.is_empty() {
+                req.plan_config.enable_reprocessing_lp
+            } else {
+                req.entries.iter().any(|e| e.config.enable_reprocessing_lp)
+            }
+        }
+    };
+
+    let credit_surplus = match req.scope {
+        OptimizeScope::Entry => req
+            .entries
+            .first()
+            .map(|e| e.config.credit_surplus_minerals)
+            .unwrap_or(req.plan_config.credit_surplus_minerals),
+        OptimizeScope::Plan => {
+            if req.entries.is_empty() {
+                req.plan_config.credit_surplus_minerals
+            } else {
+                req.entries.iter().any(|e| e.config.credit_surplus_minerals)
+            }
+        }
+    };
+
+    let reprocessing_structure_id = match req.scope {
+        OptimizeScope::Entry => req
+            .entries
+            .first()
+            .and_then(|e| e.config.reprocessing_structure_id.as_deref())
+            .or(req.plan_config.reprocessing_structure_id.as_deref()),
+        OptimizeScope::Plan => req
+            .entries
+            .iter()
+            .find_map(|e| e.config.reprocessing_structure_id.as_deref())
+            .or(req.plan_config.reprocessing_structure_id.as_deref()),
+    };
+
+    // Aggregate reservations from all OTHER validated plans
+    let mut reserved_by_other_plans: HashMap<(u64, u32), u64> = HashMap::new();
+    for plan in &saved_plans {
+        if !plan.validated || req.plan_id.as_deref() == Some(plan.id.as_str()) {
+            continue;
+        }
+        for res in &plan.reserved_resources {
+            *reserved_by_other_plans
+                .entry((res.location_id, res.type_id))
+                .or_insert(0) += res.quantity;
+        }
+    }
 
     // 1. Walk plan entries to collect all reachable type_ids for pricing and stock filtering
     let mut buy_type_ids: HashSet<u32> = HashSet::new();
@@ -253,8 +281,7 @@ pub async fn run_optimizer(
 
     relevant_asset_types.extend(&buy_type_ids);
 
-    // Add candidate compressed ores for LP if any base mineral appears in the tree
-    if req.enable_reprocessing_lp {
+    if reprocessing_enabled {
         let needed_base: HashSet<u32> = buy_type_ids
             .iter()
             .copied()
@@ -307,27 +334,22 @@ pub async fn run_optimizer(
         )?
     };
 
-    // 3. Build Assets inventory (local stock in selected structure vs haulable elsewhere)
-    let stock_inventory = if req.use_character_assets
+    // 3. Build per-location Assets inventory (minus other validated plans' reservations)
+    let any_uses_assets = req.entries.iter().any(|e| e.config.use_character_assets);
+
+    let stock_inventory = if any_uses_assets
         && let Some(char_id) = req.character_id
     {
         match fetch_cached_character_assets(app, state, char_id, req.force_asset_refresh).await {
             Ok(assets) => {
-                let selected_loc = mfg_structure.and_then(|s| s.location_id);
-                if mfg_structure.is_some() && selected_loc.is_none() {
-                    warnings.push(
-                        "Selected structure has no linked EVE location ID; local stock deduction skipped (all stock shown as haulable)."
-                            .to_string(),
-                    );
-                }
                 build_stock_inventory(
                     app,
                     state,
                     char_id,
                     &assets,
-                    selected_loc,
                     &settings.structures,
                     &relevant_asset_types,
+                    &reserved_by_other_plans,
                 )
                     .await
             }
@@ -340,30 +362,80 @@ pub async fn run_optimizer(
         StockInventory::default()
     };
 
-    let mut remaining_local = stock_inventory.local.clone();
+    let reserved_by_other_plans_count = stock_inventory.reserved_elsewhere.len();
+    if reserved_by_other_plans_count > 0 {
+        warnings.push(format!(
+            "{} material type(s) had available stock reduced by other validated plans.",
+            reserved_by_other_plans_count
+        ));
+    }
 
-    let ctx = EvalContext {
-        sde: &sde,
-        buy_prices: &buy_prices,
-        esi_prices: &esi_prices,
-        material_basis: &pricing.material_price_basis,
-        skills: &skills,
-        mfg_structure,
-        rxn_structure,
-        overrides: &req.overrides,
-        bp_me_overrides: &req.bp_me_overrides,
-        bp_te_overrides: &req.bp_te_overrides,
-        default_me: req.default_me,
-        default_te: req.default_te,
-        haulable: &stock_inventory.haulable,
-    };
+    let mut remaining_by_loc = stock_inventory.by_location.clone();
+    let mut consumed_by_loc: HashMap<(u64, u32), u64> = HashMap::new();
+    let mut unlinked_warned: HashSet<String> = HashSet::new();
 
-    // 4. Evaluate Buy-vs-Craft DAG for every entry
-    let multiplier = req.quantity_multiplier.max(1);
+    // 4. Evaluate Buy-vs-Craft DAG per entry using each entry's own config
     let mut nodes = Vec::new();
     let mut total_revenue_net = 0.0;
 
     for entry in &req.entries {
+        let entry_cfg = &entry.config;
+        let entry_multiplier = entry_cfg.quantity.max(1);
+
+        let mfg_structure = resolve_structure(
+            &settings.structures,
+            entry_cfg.manufacturing_structure_id.as_deref(),
+        );
+        let rxn_structure = resolve_structure(
+            &settings.structures,
+            entry_cfg
+                .reaction_structure_id
+                .as_deref()
+                .or(entry_cfg.reprocessing_structure_id.as_deref()),
+        );
+
+        let use_assets = entry_cfg.use_character_assets;
+        let selected_loc = mfg_structure.and_then(|s| s.location_id);
+
+        if use_assets
+            && let Some(s) = mfg_structure
+            && selected_loc.is_none()
+            && unlinked_warned.insert(s.name.clone())
+        {
+            warnings.push(format!(
+                "Structure '{}' has no linked EVE location ID; local stock deduction skipped (all stock shown as haulable).",
+                s.name
+            ));
+        }
+
+        let haulable_for_entry = haulable_map_from(
+            &remaining_by_loc,
+            &stock_inventory.location_names,
+            if use_assets { selected_loc } else { None },
+        );
+
+        let mut entry_local = match (use_assets, selected_loc) {
+            (true, Some(loc_id)) => remaining_by_loc.get(&loc_id).cloned().unwrap_or_default(),
+            _ => HashMap::new(),
+        };
+        let before_local = entry_local.clone();
+
+        let ctx = EvalContext {
+            sde: &sde,
+            buy_prices: &buy_prices,
+            esi_prices: &esi_prices,
+            material_basis: &pricing.material_price_basis,
+            skills: &skills,
+            mfg_structure,
+            rxn_structure,
+            overrides: &entry_cfg.overrides,
+            bp_me_overrides: &req.bp_me_overrides,
+            bp_te_overrides: &req.bp_te_overrides,
+            default_me: entry_cfg.default_me,
+            default_te: entry_cfg.default_te,
+            haulable: &haulable_for_entry,
+        };
+
         for bp in &entry.blueprints {
             let out_per_run = sde
                 .blueprints
@@ -377,10 +449,10 @@ pub async fn run_optimizer(
                     (bp.runs.max(1) as u64) * out_per_run
                 }
             };
-            let target_qty = base_target_qty.saturating_mul(multiplier);
+            let target_qty = base_target_qty.saturating_mul(entry_multiplier);
 
             if let Some(node) =
-                evaluate_root_blueprint(&ctx, bp.blueprint_type_id, target_qty, &mut remaining_local)
+                evaluate_root_blueprint(&ctx, bp.blueprint_type_id, target_qty, &mut entry_local)
             {
                 let unit_rev = effective_sell_unit_revenue(
                     sell_prices.get(&node.type_id),
@@ -399,12 +471,12 @@ pub async fn run_optimizer(
 
         for item in &entry.buy_only_items {
             let mut visiting = HashSet::new();
-            let target_qty = (item.quantity.max(1) as u64).saturating_mul(multiplier);
+            let target_qty = (item.quantity.max(1) as u64).saturating_mul(entry_multiplier);
             let node = evaluate_material_node(
                 &ctx,
                 item.item_type_id,
                 target_qty,
-                &mut remaining_local,
+                &mut entry_local,
                 &mut visiting,
             );
             let unit_rev = effective_sell_unit_revenue(
@@ -414,6 +486,24 @@ pub async fn run_optimizer(
             );
             total_revenue_net += unit_rev * (target_qty as f64);
             nodes.push(node);
+        }
+
+        if use_assets
+            && let Some(loc_id) = selected_loc
+        {
+            for (&type_id, &before_qty) in &before_local {
+                let after_qty = entry_local.get(&type_id).copied().unwrap_or(0);
+                let used = before_qty.saturating_sub(after_qty);
+                if used > 0 {
+                    *consumed_by_loc.entry((loc_id, type_id)).or_insert(0) += used;
+                }
+            }
+            entry_local.retain(|_, q| *q > 0);
+            if entry_local.is_empty() {
+                remaining_by_loc.remove(&loc_id);
+            } else {
+                remaining_by_loc.insert(loc_id, entry_local);
+            }
         }
     }
 
@@ -439,13 +529,15 @@ pub async fn run_optimizer(
         .sum();
 
     // 6. Run Mineral-Basket Reprocessing LP on consolidated base minerals
+    let reprocessing_structure = resolve_structure(&settings.structures, reprocessing_structure_id);
+
     let mineral_basket: HashMap<u32, u64> = buy_totals
         .iter()
         .filter(|(id, (qty, _))| is_base_mineral(**id) && *qty > 0)
         .map(|(&id, &(qty, _))| (id, qty))
         .collect();
 
-    let reprocessing = if req.enable_reprocessing_lp && !mineral_basket.is_empty() {
+    let reprocessing = if reprocessing_enabled && !mineral_basket.is_empty() {
         let lp_plan = solve_mineral_reprocessing(&ReprocessInput {
             sde: &sde,
             needed_minerals: &mineral_basket,
@@ -453,35 +545,37 @@ pub async fn run_optimizer(
             sell_prices: &sell_prices,
             material_basis: &pricing.material_price_basis,
             product_basis: &pricing.product_price_basis,
-            structure: reproc_structure,
+            structure: reprocessing_structure,
             skills: &skills,
-            credit_surplus: req.credit_surplus_minerals,
+            credit_surplus,
         });
         Some(lp_plan)
     } else {
         None
     };
 
-    // Build final shopping list (if LP used reprocessing, swap raw minerals for ores + shortfall)
+    // Any stock remaining in `remaining_by_loc` for items still on the shopping list is haulable
+    let final_haulable = haulable_map_from(&remaining_by_loc, &stock_inventory.location_names, None);
+
     let mut shopping_list: Vec<ShoppingItem> = Vec::new();
-    let reproc_active = reprocessing
+    let reprocessing_active = reprocessing
         .as_ref()
         .map(|r| r.used_reprocessing)
         .unwrap_or(false);
 
     for (&type_id, &(qty, unit_price)) in &buy_totals {
-        if reproc_active && is_base_mineral(type_id) {
+        if reprocessing_active && is_base_mineral(type_id) {
             continue;
         }
         let from_local = stock_totals.get(&type_id).map(|(q, _)| *q).unwrap_or(0);
         shopping_list.push(ShoppingItem {
             type_id,
-            name: ctx.type_name(type_id),
+            name: sde_type_name(&sde, type_id),
             quantity: qty,
             unit_price,
             total_cost: unit_price * (qty as f64),
             from_local_stock: from_local,
-            haulable_stock: stock_inventory.haulable.get(&type_id).cloned().unwrap_or_default(),
+            haulable_stock: final_haulable.get(&type_id).cloned().unwrap_or_default(),
         });
     }
 
@@ -496,11 +590,7 @@ pub async fn run_optimizer(
                 unit_price: ore.unit_price,
                 total_cost: ore.total_cost,
                 from_local_stock: 0,
-                haulable_stock: stock_inventory
-                    .haulable
-                    .get(&ore.type_id)
-                    .cloned()
-                    .unwrap_or_default(),
+                haulable_stock: final_haulable.get(&ore.type_id).cloned().unwrap_or_default(),
             });
         }
         for min in &lp.direct_minerals {
@@ -512,11 +602,7 @@ pub async fn run_optimizer(
                 unit_price: min.unit_price,
                 total_cost: min.total_cost,
                 from_local_stock: from_local,
-                haulable_stock: stock_inventory
-                    .haulable
-                    .get(&min.type_id)
-                    .cloned()
-                    .unwrap_or_default(),
+                haulable_stock: final_haulable.get(&min.type_id).cloned().unwrap_or_default(),
             });
         }
     }
@@ -526,12 +612,25 @@ pub async fn run_optimizer(
     let mut job_queue: Vec<JobSummary> = jobs_map.into_values().collect();
     job_queue.sort_by_key(|a| std::cmp::Reverse(a.duration_secs));
 
+    let mut used_local_resources: Vec<ReservedResource> = consumed_by_loc
+        .into_iter()
+        .map(|((location_id, type_id), quantity)| ReservedResource {
+            location_id,
+            location_name: stock_inventory
+                .location_names
+                .get(&location_id)
+                .cloned()
+                .unwrap_or_else(|| format!("Location {}", location_id)),
+            type_id,
+            name: sde_type_name(&sde, type_id),
+            quantity,
+        })
+        .collect();
+    used_local_resources.sort_by_key(|r| std::cmp::Reverse(r.quantity));
+
     let total_build_cost_before_reproc = total_buy_materials_cost + total_job_cost;
-    let reproc_savings = reprocessing
-        .as_ref()
-        .map(|r| r.savings)
-        .unwrap_or(0.0);
-    let total_build_cost_final = (total_build_cost_before_reproc - reproc_savings).max(0.0);
+    let reprocessing_savings = reprocessing.as_ref().map(|r| r.savings).unwrap_or(0.0);
+    let total_build_cost_final = (total_build_cost_before_reproc - reprocessing_savings).max(0.0);
     let net_profit = total_revenue_net - total_build_cost_final;
     let profit_margin_percent = if total_build_cost_final > 0.0 {
         (net_profit / total_build_cost_final) * 100.0
@@ -553,6 +652,8 @@ pub async fn run_optimizer(
         shopping_list,
         job_queue,
         reprocessing,
+        used_local_resources,
+        reserved_by_other_plans_count,
         warnings,
     })
 }

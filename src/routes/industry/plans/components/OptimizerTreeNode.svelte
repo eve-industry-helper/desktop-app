@@ -1,12 +1,18 @@
 <script lang="ts">
     import type { DecisionOverride, OptimizedNode } from '$lib/types/backend';
     import OptimizerTreeNode from './OptimizerTreeNode.svelte';
-    import { cycleNodeOverride, formatDuration, formatIsk, optimizerConfig } from './optimizer';
+    import {
+        activeOverrides,
+        activePlanValidated,
+        cycleNodeOverride,
+        formatDuration,
+        formatIsk
+    } from './optimizer';
 
     export let node: OptimizedNode;
     export let depth = 0;
 
-    $: activeOverride = ($optimizerConfig.overrides[node.typeId] ?? 'auto') as DecisionOverride;
+    $: activeOverride = ($activeOverrides[node.typeId] ?? 'auto') as DecisionOverride;
     $: totalHaulable = node.haulableStock.reduce((sum, h) => sum + h.quantity, 0);
     $: haulableTooltip = node.haulableStock
         .map(h => `${h.quantity.toLocaleString()} @ ${h.locationName}`)
@@ -21,6 +27,7 @@
     function handleCycle(event: Event) {
         event.preventDefault();
         event.stopPropagation();
+        if ($activePlanValidated) return;
         cycleNodeOverride(node.typeId);
     }
 </script>
@@ -63,7 +70,7 @@
             <span class="opt-node-costs">
                 {#if node.craftCost !== null}
                     <span class="cost-compare" title="Market Buy vs Craft (Materials + Job Fee)">
-                        Buy {formatIsk(node.buyCost)} · Craft {formatIsk(node.craftCost)}
+                        Buy {formatIsk(node.buyCost)} · Craft {formatIsk(node.craftCost ?? 0)}
                     </span>
                 {/if}
                 <span class="chosen-cost">{formatIsk(node.chosenCost)}</span>
@@ -78,6 +85,7 @@
                     class:forced={activeOverride !== 'auto'}
                     on:click={handleCycle}
                     title="Click to cycle: Auto → Force Buy → Force Craft"
+                    disabled={$activePlanValidated}
             >
                 {decisionLabel(node, activeOverride)}
             </button>
@@ -123,7 +131,7 @@
         <span class="opt-node-costs">
             {#if node.craftCost !== null}
                 <span class="cost-compare">
-                    Buy {formatIsk(node.buyCost)} · Craft {formatIsk(node.craftCost)}
+                    Buy {formatIsk(node.buyCost)} · Craft {formatIsk(node.craftCost ?? 0)}
                 </span>
             {/if}
             <span class="chosen-cost">{formatIsk(node.chosenCost)}</span>
@@ -138,6 +146,7 @@
                     class:forced={activeOverride !== 'auto'}
                     on:click={handleCycle}
                     title="Click to cycle: Auto → Force Buy → Force Craft"
+                    disabled={$activePlanValidated}
             >
                 {decisionLabel(node, activeOverride)}
             </button>

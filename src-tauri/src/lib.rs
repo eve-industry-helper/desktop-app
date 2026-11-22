@@ -1,7 +1,7 @@
 mod commands;
 mod core;
 
-use crate::commands::auth::{login_eve_standalone};
+use crate::commands::auth::login_eve_standalone;
 use crate::commands::config::{load_config, save_config};
 use crate::commands::esi::{
     get_active_character,
@@ -14,22 +14,18 @@ use crate::commands::esi::{
     resolve_eve_names,
 };
 use crate::commands::industry::{
+    export_structure_json,
     get_blueprint_materials,
+    list_character_asset_locations,
     load_industry_settings,
     load_plans,
+    optimize_plan,
     save_industry_settings,
     save_plans,
-    optimize_plan,
-    list_character_asset_locations
+    search_sde_blueprints,
 };
-use crate::commands::market::{
-    fetch_market_prices,
-    fetch_esi_adjusted_prices
-};
-use crate::commands::sde::{
-    sync_sde,
-    get_sde_status
-};
+use crate::commands::market::{fetch_esi_adjusted_prices, fetch_market_prices};
+use crate::commands::sde::{get_sde_status, sync_sde};
 use crate::core::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -51,6 +47,7 @@ pub fn run() {
             load_plans,
             save_plans,
             get_blueprint_materials,
+            search_sde_blueprints,
             get_character_skills,
             save_industry_settings,
             load_industry_settings,
@@ -59,7 +56,8 @@ pub fn run() {
             sync_sde,
             get_sde_status,
             optimize_plan,
-            list_character_asset_locations
+            list_character_asset_locations,
+            export_structure_json
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,132 +1,87 @@
-import { writable, get } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { activeCharacterId } from '$lib/stores/global';
-import { structuresList } from '$lib/stores/industrySettings';
 import type {
     DecisionOverride,
     OptimizationResult,
     OptimizePlanRequest,
+    OptimizeScope,
     ShoppingItem
 } from '$lib/types/backend';
-import type { IndustryStructure, PlanEntry } from '$lib/types/frontend';
+import type { BuildConfig, IndustryPlan, PlanEntry } from '$lib/types/frontend';
+import {
+    ensureBuildConfig,
+    selectedEntry,
+    selectedPlan,
+    setPlanValidation,
+    updateEntryConfig,
+    updatePlanConfig,
+    clearPlanOverrides,
+    setPlanOverride
+} from '../plans';
 
 export type ResultTab = 'tree' | 'shopping' | 'reprocessing' | 'jobs' | 'blueprints';
-export type OptimizeScope = 'entry' | 'plan';
-
-export interface OptimizerConfig {
-    manufacturingStructureId: string | null;
-    reactionStructureId: string | null;
-    reprocessingStructureId: string | null;
-    defaultMe: number;
-    defaultTe: number;
-    quantityMultiplier: number;
-    useCharacterAssets: boolean;
-    enableReprocessingLp: boolean;
-    creditSurplusMinerals: boolean;
-    overrides: Record<number, DecisionOverride>;
-    bpMeOverrides: Record<number, number>;
-    bpTeOverrides: Record<number, number>;
-}
-
-export const optimizerConfig = writable<OptimizerConfig>({
-    manufacturingStructureId: null,
-    reactionStructureId: null,
-    reprocessingStructureId: null,
-    defaultMe: 10,
-    defaultTe: 20,
-    quantityMultiplier: 1,
-    useCharacterAssets: true,
-    enableReprocessingLp: true,
-    creditSurplusMinerals: false,
-    overrides: {},
-    bpMeOverrides: {},
-    bpTeOverrides: {}
-});
 
 export const optimizationResult = writable<OptimizationResult | null>(null);
 export const isOptimizing = writable<boolean>(false);
+export const isValidatingPlan = writable<boolean>(false);
 export const optimizerError = writable<string>('');
 export const activeResultTab = writable<ResultTab>('tree');
 export const optimizeScope = writable<OptimizeScope>('entry');
 export const copiedNotice = writable<string>('');
 
-let lastEntries: PlanEntry[] = [];
+export const activePlanValidated = derived(selectedPlan, $plan => Boolean($plan?.validated));
 
-function pickDefaultStructures(structures: IndustryStructure[], cfg: OptimizerConfig): OptimizerConfig {
-    if (structures.length === 0) return cfg;
-
-    let mfgId = cfg.manufacturingStructureId;
-    if (!mfgId || !structures.some(s => s.id === mfgId)) {
-        const preferred =
-            structures.find(s => s.services.includes('Manufacturing')) ??
-            structures.find(s => ['sotiyo', 'azbel', 'raitaru'].includes(s.structureType)) ??
-            structures[0];
-        mfgId = preferred?.id ?? null;
+export const activeOverrides = derived(
+    [selectedPlan, selectedEntry, optimizeScope],
+    ([$plan, $entry, $scope]): Record<number, DecisionOverride> => {
+        if ($scope === 'entry') {
+            return ensureBuildConfig($entry?.config).overrides;
+        }
+        const merged: Record<number, DecisionOverride> = {};
+        for (const e of $plan?.entries ?? []) {
+            Object.assign(merged, ensureBuildConfig(e.config).overrides);
+        }
+        return merged;
     }
+);
 
-    let rxnId = cfg.reactionStructureId;
-    if (rxnId && !structures.some(s => s.id === rxnId)) rxnId = null;
-    if (!rxnId) {
-        const ref =
-            structures.find(s => s.services.includes('Reactions')) ??
-            structures.find(s => ['tatara', 'athanor'].includes(s.structureType));
-        rxnId = ref?.id ?? null;
-    }
-
-    let reprocId = cfg.reprocessingStructureId;
-    if (reprocId && !structures.some(s => s.id === reprocId)) reprocId = null;
-    if (!reprocId) {
-        const ref =
-            structures.find(s => s.services.includes('Reprocessing')) ??
-            structures.find(s => ['tatara', 'athanor'].includes(s.structureType));
-        reprocId = ref?.id ?? null;
-    }
+function buildRequest(
+    plan: IndustryPlan,
+    entry: PlanEntry | null,
+    scope: OptimizeScope,
+    options: { forcePriceRefresh?: boolean; forceAssetRefresh?: boolean } = {}
+): OptimizePlanRequest {
+    const entries = scope === 'plan' ? plan.entries : entry ? [entry] : [];
+    const normalizedEntries: PlanEntry[] = entries.map(e => ({
+        ...e,
+        config: ensureBuildConfig(e.config)
+    }));
 
     return {
-        ...cfg,
-        manufacturingStructureId: mfgId,
-        reactionStructureId: rxnId,
-        reprocessingStructureId: reprocId
-    };
-}
-
-export function ensureDefaultStructures() {
-    const structures = get(structuresList);
-    optimizerConfig.update(cfg => pickDefaultStructures(structures, cfg));
-}
-
-export async function runPlanOptimization(
-    entries: PlanEntry[],
-    options: { forcePriceRefresh?: boolean; forceAssetRefresh?: boolean } = {}
-) {
-    lastEntries = entries;
-    if (entries.length === 0) {
-        optimizationResult.set(null);
-        return;
-    }
-
-    ensureDefaultStructures();
-    const cfg = get(optimizerConfig);
-    const charId = get(activeCharacterId);
-
-    const request: OptimizePlanRequest = {
-        characterId: charId,
-        entries,
-        manufacturingStructureId: cfg.manufacturingStructureId,
-        reactionStructureId: cfg.reactionStructureId,
-        reprocessingStructureId: cfg.reprocessingStructureId,
-        overrides: cfg.overrides,
-        bpMeOverrides: cfg.bpMeOverrides,
-        bpTeOverrides: cfg.bpTeOverrides,
-        defaultMe: Math.max(0, Math.min(10, Number(cfg.defaultMe) || 0)),
-        defaultTe: Math.max(0, Math.min(20, Number(cfg.defaultTe) || 0)),
-        quantityMultiplier: Math.max(1, Math.floor(Number(cfg.quantityMultiplier) || 1)),
-        useCharacterAssets: cfg.useCharacterAssets,
-        enableReprocessingLp: cfg.enableReprocessingLp,
-        creditSurplusMinerals: cfg.creditSurplusMinerals,
+        characterId: get(activeCharacterId),
+        planId: plan.id,
+        scope,
+        planConfig: ensureBuildConfig(plan.config),
+        entries: normalizedEntries,
+        bpMeOverrides: {},
+        bpTeOverrides: {},
         forcePriceRefresh: options.forcePriceRefresh ?? false,
         forceAssetRefresh: options.forceAssetRefresh ?? false
     };
+}
+
+export async function runPlanOptimization(
+    plan: IndustryPlan,
+    entry: PlanEntry | null,
+    scope: OptimizeScope,
+    options: { forcePriceRefresh?: boolean; forceAssetRefresh?: boolean } = {}
+) {
+    const request = buildRequest(plan, entry, scope, options);
+    if (request.entries.length === 0) {
+        optimizationResult.set(null);
+        return;
+    }
 
     isOptimizing.set(true);
     optimizerError.set('');
@@ -142,35 +97,105 @@ export async function runPlanOptimization(
     }
 }
 
-export async function rerunLastOptimization(
+export async function rerunActiveOptimization(
     options: { forcePriceRefresh?: boolean; forceAssetRefresh?: boolean } = {}
 ) {
-    if (lastEntries.length > 0) {
-        await runPlanOptimization(lastEntries, options);
+    const plan = get(selectedPlan);
+    if (!plan) return;
+    const entry = get(selectedEntry);
+    const scope = get(optimizeScope);
+    await runPlanOptimization(plan, entry, scope, options);
+}
+
+export async function applyConfigChange(patch: Partial<BuildConfig>) {
+    const plan = get(selectedPlan);
+    const entry = get(selectedEntry);
+    const scope = get(optimizeScope);
+    if (!plan || plan.validated) return;
+
+    if (scope === 'plan') {
+        await updatePlanConfig(plan.id, patch);
+    } else if (entry) {
+        await updateEntryConfig(plan.id, entry.id, patch);
     }
+
+    await rerunActiveOptimization();
 }
 
 export async function cycleNodeOverride(typeId: number) {
-    optimizerConfig.update(cfg => {
-        const current = cfg.overrides[typeId] ?? 'auto';
-        const next: DecisionOverride =
-            current === 'auto' ? 'buy' : current === 'buy' ? 'craft' : 'auto';
+    const plan = get(selectedPlan);
+    const entry = get(selectedEntry);
+    const scope = get(optimizeScope);
+    if (!plan || plan.validated) return;
 
-        const overrides = { ...cfg.overrides };
+    const current = get(activeOverrides)[typeId] ?? 'auto';
+    const next: DecisionOverride =
+        current === 'auto' ? 'buy' : current === 'buy' ? 'craft' : 'auto';
+
+    if (scope === 'plan') {
+        await setPlanOverride(plan.id, typeId, next);
+    } else if (entry) {
+        const entryCfg = ensureBuildConfig(entry.config);
+        const overrides = { ...entryCfg.overrides };
         if (next === 'auto') {
             delete overrides[typeId];
         } else {
             overrides[typeId] = next;
         }
-        return { ...cfg, overrides };
-    });
+        await updateEntryConfig(plan.id, entry.id, { overrides });
+    }
 
-    await rerunLastOptimization();
+    await rerunActiveOptimization();
 }
 
 export async function clearOverrides() {
-    optimizerConfig.update(cfg => ({ ...cfg, overrides: {} }));
-    await rerunLastOptimization();
+    const plan = get(selectedPlan);
+    const entry = get(selectedEntry);
+    const scope = get(optimizeScope);
+    if (!plan || plan.validated) return;
+
+    if (scope === 'plan') {
+        await clearPlanOverrides(plan.id);
+    } else if (entry) {
+        await updateEntryConfig(plan.id, entry.id, { overrides: {} });
+    }
+
+    await rerunActiveOptimization();
+}
+
+export async function validatePlan(plan: IndustryPlan) {
+    if (plan.entries.length === 0) return;
+
+    isValidatingPlan.set(true);
+    optimizerError.set('');
+
+    try {
+        // Always solve the entire plan so every entry's local hangar usage is reserved
+        const request = buildRequest(plan, null, 'plan');
+        const fullResult = await invoke<OptimizationResult>('optimize_plan', { request });
+        await setPlanValidation(plan.id, true, fullResult.usedLocalResources);
+
+        if (get(optimizeScope) === 'plan') {
+            optimizationResult.set(fullResult);
+        } else {
+            await rerunActiveOptimization();
+        }
+    } catch (error) {
+        console.error('Failed to validate plan:', error);
+        optimizerError.set(`Failed to validate plan: ${error}`);
+    } finally {
+        isValidatingPlan.set(false);
+    }
+}
+
+export async function unvalidatePlan(plan: IndustryPlan) {
+    isValidatingPlan.set(true);
+    try {
+        await setPlanValidation(plan.id, false, []);
+        await rerunActiveOptimization();
+    } finally {
+        isValidatingPlan.set(false);
+    }
 }
 
 export function formatIsk(value: number): string {

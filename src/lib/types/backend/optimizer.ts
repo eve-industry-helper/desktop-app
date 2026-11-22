@@ -1,6 +1,12 @@
-import type { PlanEntry } from '$lib/types/frontend';
+import type {
+    BuildConfig,
+    DecisionOverride,
+    PlanEntry,
+    ReservedResource
+} from '$lib/types/frontend';
 
-export type DecisionOverride = 'auto' | 'buy' | 'craft';
+export type { DecisionOverride };
+export type OptimizeScope = 'entry' | 'plan';
 export type NodeDecision = 'buy' | 'craft' | 'instock';
 export type BlueprintActivity = 'manufacturing' | 'reaction';
 
@@ -12,19 +18,12 @@ export interface HaulableStockEntry {
 
 export interface OptimizePlanRequest {
     characterId: number | null;
+    planId: string | null;
+    scope: OptimizeScope;
+    planConfig: BuildConfig;
     entries: PlanEntry[];
-    manufacturingStructureId: string | null;
-    reactionStructureId: string | null;
-    reprocessingStructureId: string | null;
-    overrides: Record<number, DecisionOverride>;
     bpMeOverrides: Record<number, number>;
     bpTeOverrides: Record<number, number>;
-    defaultMe: number;
-    defaultTe: number;
-    quantityMultiplier: number;
-    useCharacterAssets: boolean;
-    enableReprocessingLp: boolean;
-    creditSurplusMinerals: boolean;
     forcePriceRefresh: boolean;
     forceAssetRefresh: boolean;
 }
@@ -130,10 +129,20 @@ export interface OptimizationResult {
     jobQueue: JobSummary[];
     reprocessing: ReprocessingPlan | null;
     warnings: string[];
+    usedLocalResources: ReservedResource[];
+    reservedByOtherPlansCount: number;
 }
 
 export interface AssetLocationOption {
     locationId: number;
     name: string;
     itemCount: number;
+}
+
+export interface BlueprintSearchMatch {
+    blueprintTypeId: number;
+    blueprintName: string;
+    productTypeId: number;
+    productName: string;
+    activity: BlueprintActivity;
 }

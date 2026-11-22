@@ -24,13 +24,20 @@
     </div>
 
     <div class="sidebar-top">
-        <button type="button" class="add-plan-btn" on:click={() => openAddEntry('fit')}>
-            + Add to Plan
+        <button
+                type="button"
+                class="add-plan-btn"
+                on:click={() => openAddEntry('fit')}
+                disabled={Boolean(plan.validated)}
+                title={plan.validated ? 'Unlock plan to add entries' : 'Add a fit, blueprint, or reaction'}
+        >
+            {plan.validated ? 'Plan Locked' : '+ Add to Plan'}
         </button>
     </div>
 
     <div class="sidebar-list">
         {#each plan.entries as entry (entry.id)}
+            {@const qty = entry.config?.quantity ?? 1}
             <button
                     type="button"
                     class="plan-item"
@@ -46,6 +53,9 @@
                     {entry.kind === 'fit' ? 'FIT' : entry.kind === 'blueprint' ? 'BP' : 'RXN'}
                 </span>
                 <span class="plan-item-name">{entry.name}</span>
+                {#if qty > 1}
+                    <span class="entry-qty-pill">×{qty}</span>
+                {/if}
             </button>
         {:else}
             <p class="sidebar-empty">Empty plan. Add a fit, blueprint, or reaction.</p>
