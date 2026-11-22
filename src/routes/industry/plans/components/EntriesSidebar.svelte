@@ -6,7 +6,7 @@
         removePlan,
         selectEntry,
         selectedEntryId
-    } from './plans';
+    } from '../plans';
 
     export let plan: IndustryPlan;
 </script>

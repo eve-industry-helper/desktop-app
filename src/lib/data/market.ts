@@ -14,11 +14,11 @@ export const PRICE_PROVIDERS: { value: PriceProvider; label: string; requiresKey
 ];
 
 export const MARKET_HUBS: MarketHub[] = [
-    { id: 10000002, systemId: 30000142, janiceMarketId: 2, name: 'Jita (The Forge)' },
-    { id: 10000043, systemId: 30002187, janiceMarketId: 3, name: 'Amarr (Domain)' },
-    { id: 10000032, systemId: 30002659, janiceMarketId: 4, name: 'Dodixie (Sinq Laison)' },
-    { id: 10000030, systemId: 30002510, janiceMarketId: 5, name: 'Rens (Heimatar)' },
-    { id: 10000042, systemId: 30002053, janiceMarketId: 6, name: 'Hek (Metropolis)' }
+    { id: 10000002, systemId: 30000142, janiceMarketId: 2,   name: 'Jita (The Forge)' },
+    { id: 10000043, systemId: 30002187, janiceMarketId: 115, name: 'Amarr (Domain)' },
+    { id: 10000032, systemId: 30002659, janiceMarketId: 117, name: 'Dodixie (Sinq Laison)' },
+    { id: 10000030, systemId: 30002510, janiceMarketId: 116, name: 'Rens (Heimatar)' },
+    { id: 10000042, systemId: 30002053, janiceMarketId: 118, name: 'Hek (Metropolis)' }
 ];
 
 export const PRICE_BASIS_OPTIONS: { value: PriceBasis; label: string }[] = [

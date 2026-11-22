@@ -19,6 +19,16 @@ use crate::commands::industry::{
     load_plans,
     save_industry_settings,
     save_plans,
+    optimize_plan,
+    list_character_asset_locations
+};
+use crate::commands::market::{
+    fetch_market_prices,
+    fetch_esi_adjusted_prices
+};
+use crate::commands::sde::{
+    sync_sde,
+    get_sde_status
 };
 use crate::core::state::AppState;
 
@@ -43,7 +53,13 @@ pub fn run() {
             get_blueprint_materials,
             get_character_skills,
             save_industry_settings,
-            load_industry_settings
+            load_industry_settings,
+            fetch_esi_adjusted_prices,
+            fetch_market_prices,
+            sync_sde,
+            get_sde_status,
+            optimize_plan,
+            list_character_asset_locations
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

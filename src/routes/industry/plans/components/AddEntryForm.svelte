@@ -8,7 +8,7 @@
         isResolving,
         singleItemName,
         singleItemRuns
-    } from './plans';
+    } from '../plans';
 
     export let planName: string;
 </script>

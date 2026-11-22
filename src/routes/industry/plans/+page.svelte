@@ -7,10 +7,10 @@
         selectedEntry,
         selectedPlan
     } from './plans';
-    import PlansSidebar from './PlansSidebar.svelte';
-    import EntriesSidebar from './EntriesSidebar.svelte';
-    import AddEntryForm from './AddEntryForm.svelte';
-    import EntryDetails from './EntryDetails.svelte';
+    import PlansSidebar from './components/PlansSidebar.svelte';
+    import EntriesSidebar from './components/EntriesSidebar.svelte';
+    import AddEntryForm from './components/AddEntryForm.svelte';
+    import EntryDetails from './components/EntryDetails.svelte';
 
     $: currentPlan = $selectedPlan;
     $: currentEntry = $selectedEntry;
@@ -32,7 +32,7 @@
             {#if $isAddingEntry}
                 <AddEntryForm planName={currentPlan.name} />
             {:else if currentEntry}
-                <EntryDetails entry={currentEntry} />
+                <EntryDetails entry={currentEntry} plan={currentPlan} />
             {:else}
                 <div class="workspace-empty">
                     <p>Select an item in <strong>{currentPlan.name}</strong>, or click <strong>+ Add to Plan</strong>.</p>

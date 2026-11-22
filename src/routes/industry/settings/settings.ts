@@ -1,4 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
+import { invoke } from '@tauri-apps/api/core';
+import { activeCharacterId } from '$lib/stores/global';
+import type { AssetLocationOption } from '$lib/types/backend';
 import { parseEftFit } from '$lib/utils/eftParser';
 import {
     AVAILABLE_SERVICES,
@@ -67,6 +70,7 @@ export interface StructureFormState {
     facilityTax: number;
     rigs: [string, string, string];
     services: string[];
+    locationId: number | null;
 }
 
 const DEFAULT_FORM: StructureFormState = {
@@ -78,7 +82,8 @@ const DEFAULT_FORM: StructureFormState = {
     reactionCostIndex: 0,
     facilityTax: 0,
     rigs: ['', '', ''],
-    services: ['Manufacturing']
+    services: ['Manufacturing'],
+    locationId: null
 };
 
 export const isEditingStructure = writable<boolean>(false);
@@ -98,10 +103,32 @@ export const availableRigs = derived(structureForm, ($form): string[] => {
         .map(rig => rig.name);
 });
 
+export const assetLocations = writable<AssetLocationOption[]>([]);
+export const isLoadingAssetLocations = writable<boolean>(false);
+
+export async function loadAssetLocations(forceRefresh = false) {
+    const charId = get(activeCharacterId);
+    if (!charId) return;
+
+    isLoadingAssetLocations.set(true);
+    try {
+        const locations = await invoke<AssetLocationOption[]>('list_character_asset_locations', {
+            characterId: charId,
+            forceRefresh
+        });
+        assetLocations.set(locations);
+    } catch (error) {
+        console.error('Failed to load asset locations:', error);
+    } finally {
+        isLoadingAssetLocations.set(false);
+    }
+}
+
 export function openNewStructure() {
     structureForm.set({ ...DEFAULT_FORM, rigs: ['', '', ''], services: ['Manufacturing'] });
     structureFitPaste.set('');
     isEditingStructure.set(true);
+    if (get(assetLocations).length === 0) { loadAssetLocations(); }
 }
 
 export function openEditStructure(s: IndustryStructure) {
@@ -114,10 +141,12 @@ export function openEditStructure(s: IndustryStructure) {
         reactionCostIndex: s.reactionCostIndex,
         facilityTax: s.facilityTax,
         rigs: [s.rigs[0] ?? '', s.rigs[1] ?? '', s.rigs[2] ?? ''],
-        services: [...s.services]
+        services: [...s.services],
+        locationId: s.locationId ?? null
     });
     structureFitPaste.set('');
     isEditingStructure.set(true);
+    if (get(assetLocations).length === 0) { loadAssetLocations(); }
 }
 
 export function cancelEditStructure() {
@@ -178,7 +207,8 @@ export async function handleSaveStructure() {
         reactionCostIndex: Number(f.reactionCostIndex) || 0,
         facilityTax: Number(f.facilityTax) || 0,
         rigs: meta.size ? f.rigs.map(r => r.trim()).filter(Boolean) : [],
-        services: f.services
+        services: f.services,
+        locationId: f.locationId
     });
 
     isEditingStructure.set(false);
@@ -224,4 +254,36 @@ export function handleMaterialBasisChange(event: Event) {
 export function handleProductBasisChange(event: Event) {
     const value = (event.currentTarget as HTMLSelectElement).value as PriceBasis;
     updatePriceSettings({ productPriceBasis: value });
+}
+
+export const shareNotice = writable<string>('');
+
+function flashShareNotice(message: string) {
+    shareNotice.set(message);
+    setTimeout(() => shareNotice.set(''), 3000);
+}
+
+export async function copyStructureJson(structure: IndustryStructure) {
+    try {
+        const json = JSON.stringify(structure, null, 2);
+        await navigator.clipboard.writeText(json);
+        flashShareNotice(`Copied "${structure.name}" JSON to clipboard.`);
+    } catch (error) {
+        console.error('Clipboard copy failed:', error);
+        flashShareNotice(`Failed to copy JSON: ${error}`);
+    }
+}
+
+export async function saveStructureJsonFile(structure: IndustryStructure) {
+    try {
+        const json = JSON.stringify(structure, null, 2);
+        const savedPath = await invoke<string>('export_structure_json', {
+            filename: `${structure.name}.json`,
+            jsonContent: json
+        });
+        flashShareNotice(`Saved to ${savedPath}`);
+    } catch (error) {
+        console.error('Export failed:', error);
+        flashShareNotice(`Export failed: ${error}`);
+    }
 }

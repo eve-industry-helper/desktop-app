@@ -218,7 +218,8 @@ export async function importStructuresFromFile(file: File): Promise<number> {
                 reactionCostIndex: Number(item.reactionCostIndex) || 0,
                 facilityTax: Number(item.facilityTax) || 0,
                 rigs: Array.isArray(item.rigs) ? item.rigs.slice(0, 3) : [],
-                services: Array.isArray(item.services) ? item.services : []
+                services: Array.isArray(item.services) ? item.services : [],
+                locationId: item.locationId != null ? Number(item.locationId) : null
             }));
 
         if (valid.length === 0) {

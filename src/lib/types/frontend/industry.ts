@@ -115,11 +115,6 @@ export interface CharacterSkillCache {
     skills: Record<number, number>;
 }
 
-export interface IndustrySettings {
-    characterSkills: Record<number, CharacterSkillCache>;
-    structures: IndustryStructure[];
-}
-
 export type SecurityStatus = 'highsec' | 'lowsec' | 'nullsec' | 'wormhole';
 
 export type StructureType =
@@ -143,6 +138,7 @@ export interface IndustryStructure {
     facilityTax: number;            // e.g. 1.0 for 1.0%
     rigs: string[];
     services: string[];
+    locationId?: number | null;
 }
 
 export type PriceProvider = 'fuzzwork' | 'evetycoon' | 'janice';

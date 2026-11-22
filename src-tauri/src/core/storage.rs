@@ -56,3 +56,25 @@ where
     fs::rename(&tmp_path, &path)
         .map_err(|e| format!("Failed to finalize {}: {}", filename, e))
 }
+
+pub fn write_json_compact_atomic<T>(app: &AppHandle, filename: &str, data: &T) -> Result<(), String>
+where
+    T: Serialize,
+{
+    let path = resolve_data_path(app, filename)?;
+    let tmp_path = path.with_extension("json.tmp");
+
+    let json = serde_json::to_string(data)
+        .map_err(|e| format!("Failed to serialize {}: {}", filename, e))?;
+
+    fs::write(&tmp_path, json)
+        .map_err(|e| format!("Failed to write temp file for {}: {}", filename, e))?;
+
+    #[cfg(windows)]
+    if path.exists() {
+        let _ = fs::remove_file(&path);
+    }
+
+    fs::rename(&tmp_path, &path)
+        .map_err(|e| format!("Failed to finalize {}: {}", filename, e))
+}

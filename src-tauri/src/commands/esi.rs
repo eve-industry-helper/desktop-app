@@ -18,7 +18,7 @@ use crate::core::models::eve::{
 };
 use crate::core::state::AppState;
 
-async fn parse_esi_response<T: DeserializeOwned>(res: Response) -> Result<T, String> {
+pub(crate) async fn parse_esi_response<T: DeserializeOwned>(res: Response) -> Result<T, String> {
     if res.status().is_success() {
         res.json::<T>()
             .await
@@ -30,7 +30,7 @@ async fn parse_esi_response<T: DeserializeOwned>(res: Response) -> Result<T, Str
     }
 }
 
-async fn esi_get_authed<T: DeserializeOwned>(
+pub(crate) async fn esi_get_authed<T: DeserializeOwned>(
     app: &AppHandle,
     state: &AppState,
     character_id: u32,

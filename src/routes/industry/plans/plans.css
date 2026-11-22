@@ -1,3 +1,7 @@
+/* ============================================================================
+   LAYOUT & SIDEBARS
+   ============================================================================ */
+
 .industry-layout {
     display: flex;
     height: 100%;
@@ -5,25 +9,22 @@
     overflow: hidden;
 }
 
-/* Column 1 & 2 Sidebars */
-.plans-sidebar {
-    width: 260px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--bg-darker);
-    border-right: 1px solid var(--border-subtle);
-    min-height: 0;
-}
-
+.plans-sidebar,
 .entries-sidebar {
     width: 260px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background-color: #1e1e1f;
     border-right: 1px solid var(--border-subtle);
     min-height: 0;
+}
+
+.plans-sidebar {
+    background-color: var(--bg-darker);
+}
+
+.entries-sidebar {
+    background-color: #1e1e1f;
 }
 
 .entries-header {
@@ -31,16 +32,20 @@
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 0.75rem 0.25rem 0.75rem;
+    padding: 0.75rem 0.75rem 0.25rem;
+}
+
+.entries-title,
+.plan-item-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .entries-title {
     font-size: 0.9rem;
     font-weight: 600;
     color: #fff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .sidebar-top {
@@ -104,10 +109,6 @@
     box-sizing: border-box;
 }
 
-.plan-item:hover {
-    background-color: var(--surface);
-}
-
 .plan-item.active {
     background-color: var(--surface-hover);
     border-color: var(--primary);
@@ -117,9 +118,6 @@
 .plan-item-name {
     font-size: 0.85rem;
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .plan-item-count {
@@ -135,30 +133,10 @@
     margin-top: 1.5rem;
 }
 
-.entry-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 0.15rem 0.35rem;
-    border-radius: 3px;
-    flex-shrink: 0;
-}
+/* ============================================================================
+   WORKSPACE & HEADER
+   ============================================================================ */
 
-.entry-badge.fit {
-    background-color: #264f78;
-    color: var(--accent);
-}
-
-.entry-badge.bp {
-    background-color: #1e3a2f;
-    color: #4ec9b0;
-}
-
-.entry-badge.rxn {
-    background-color: #4a3b1e;
-    color: var(--warning);
-}
-
-/* Column 3: Workspace */
 .plan-workspace {
     flex: 1;
     display: flex;
@@ -179,7 +157,14 @@
 }
 
 .workspace-header h2 {
-    margin: 0 0 0.25rem 0;
+    margin: 0 0 0.25rem;
+}
+
+.header-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
 }
 
 .workspace-empty {
@@ -191,34 +176,135 @@
     font-size: 0.9rem;
 }
 
-/* Add Entry Form */
-.mode-tabs {
+.plan-sections {
     display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    padding-bottom: 1rem;
+}
+
+.plan-section,
+.reproc-panel {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.plan-section {
+    gap: 0.5rem;
+}
+
+.reproc-panel {
+    gap: 1rem;
+}
+
+.section-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.section-title {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+}
+
+.section-title.buy-title {
+    color: var(--warning);
+}
+
+/* ============================================================================
+   TABS, SCOPE SWITCH & ADD ENTRY FORM
+   ============================================================================ */
+
+.mode-tabs,
+.result-tabs {
+    display: flex;
+    align-items: center;
     gap: 0.4rem;
-    margin-bottom: 1rem;
     border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.mode-tabs {
+    margin-bottom: 1rem;
     padding-bottom: 0.6rem;
 }
 
-.mode-tab {
+.result-tabs {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.55rem;
+}
+
+.mode-tab,
+.scope-btn {
     background: transparent;
-    border: 1px solid #333;
     color: #bbb;
-    border-radius: 4px;
-    padding: 0.4rem 0.85rem;
-    font-size: 0.82rem;
     cursor: pointer;
 }
 
-.mode-tab:hover {
+.mode-tab {
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.82rem;
+}
+
+.scope-switch {
+    display: inline-flex;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.scope-btn {
+    border: none;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.78rem;
+}
+
+.mode-tab:hover,
+.scope-btn:hover {
     background-color: var(--surface);
     color: #fff;
 }
 
-.mode-tab.active {
+.mode-tab.active,
+.scope-btn.active {
     background-color: var(--btn-primary);
-    border-color: var(--btn-primary);
     color: #fff;
+}
+
+.mode-tab.active {
+    border-color: var(--btn-primary);
+}
+
+.tab-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #4ec9b0;
+    margin-left: 0.35rem;
+    vertical-align: middle;
+}
+
+.copied-toast {
+    margin-left: auto;
+    font-size: 0.78rem;
+    color: #4ec9b0;
+    font-weight: 500;
 }
 
 .paste-box {
@@ -270,79 +356,283 @@
     flex: 0 0 110px;
 }
 
-/* Blueprints & Buy-Only Sections */
-.plan-sections {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding-right: 0.5rem;
-    padding-bottom: 1rem;
-}
+/* ============================================================================
+   OPTIMIZER CONTROLS, ALERTS & KPI / STAT CARDS
+   ============================================================================ */
 
-.plan-section {
+.opt-controls {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
     flex-shrink: 0;
 }
 
-.section-title {
-    margin: 0;
+.field-label.compact {
+    min-width: 170px;
+    flex: 1 1 170px;
+}
+
+.field-label.compact.tiny {
+    flex: 0 0 80px;
+}
+
+.opt-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    padding-bottom: 0.2rem;
+}
+
+.toggle-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    color: #ccc;
+    background-color: var(--surface);
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 0.32rem 0.55rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.opt-alert {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 5px;
     font-size: 0.8rem;
-    font-weight: 600;
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
+}
+
+.opt-alert.error {
+    background-color: rgba(244, 135, 113, 0.12);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+.opt-alert.warn {
+    background-color: rgba(220, 220, 170, 0.1);
+    border: 1px solid #6b6b45;
+    color: var(--warning);
+}
+
+.kpi-strip,
+.reproc-stats {
+    display: grid;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+
+.kpi-strip {
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    margin-bottom: 0.75rem;
+}
+
+.reproc-stats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.kpi-card,
+.mini-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.6rem 0.75rem;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+}
+
+.kpi-label,
+.mini-label {
+    font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
+    color: #999;
+}
+
+.kpi-value,
+.mini-value {
+    font-weight: 700;
+    color: #fff;
+    font-family: monospace;
+}
+
+.kpi-value {
+    font-size: 1rem;
+}
+
+.mini-value {
+    font-size: 0.92rem;
+}
+
+.kpi-sub {
+    font-size: 0.72rem;
+    color: #999;
+}
+
+.profit-pos,
+.mini-value.good {
+    color: #4ec9b0;
+}
+
+.profit-neg {
+    color: var(--danger);
+}
+
+.accent,
+.mono {
     color: var(--accent);
 }
 
-.section-title.buy-title {
+.mono {
+    font-family: monospace;
+}
+
+/* ============================================================================
+   BADGES & PILLS
+   ============================================================================ */
+
+.entry-badge,
+.decision-pill {
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.entry-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+}
+
+.decision-pill {
+    font-size: 0.68rem;
+    padding: 0.24rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    min-width: 70px;
+    text-align: center;
+}
+
+.decision-pill.static {
+    cursor: default;
+}
+
+.decision-pill.forced {
+    box-shadow: 0 0 0 1px #fff inset;
+}
+
+.entry-badge.fit,
+.decision-pill.instock {
+    background-color: #264f78;
+    color: var(--accent);
+}
+
+.decision-pill.instock {
+    border-color: #366ea5;
+}
+
+.entry-badge.bp,
+.decision-pill.craft {
+    background-color: #1e3a2f;
+    color: #4ec9b0;
+}
+
+.decision-pill.craft {
+    border-color: #2f5e4b;
+}
+
+.entry-badge.rxn,
+.decision-pill.buy {
+    background-color: #4a3b1e;
     color: var(--warning);
+}
+
+.decision-pill.buy {
+    border-color: #6f582c;
+}
+
+.stock-pill {
+    font-size: 0.69rem;
+    padding: 0.12rem 0.4rem;
+    border-radius: 3px;
+}
+
+.stock-pill.local {
+    background-color: rgba(78, 201, 176, 0.14);
+    color: #4ec9b0;
+    border: 1px solid rgba(78, 201, 176, 0.35);
+}
+
+.stock-pill.haul {
+    background-color: rgba(220, 220, 170, 0.12);
+    color: var(--warning);
+    border: 1px solid rgba(220, 220, 170, 0.32);
+}
+
+/* ============================================================================
+   SHARED SURFACE CONTAINERS (RAW BLUEPRINTS, TREE & TABLES)
+   ============================================================================ */
+
+.bp-list,
+.opt-tree-box,
+.opt-table {
+    background-color: var(--bg-color);
+    border: 1px solid #333;
+    border-radius: 6px;
+    flex-shrink: 0;
 }
 
 .bp-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    background-color: var(--bg-color);
-    border: 1px solid #333;
-    border-radius: 6px;
 }
 
-.bp-accordion {
-    border-top: 1px solid #2a2a2a;
+.opt-tree-box,
+.opt-table {
+    overflow: hidden;
 }
 
-.bp-accordion:first-child {
+.bp-accordion,
+.opt-node-branch {
+    border-top: 1px solid #262628;
+}
+
+.bp-accordion:first-child,
+.opt-node-branch:first-child {
     border-top: none;
 }
 
-.bp-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 1rem;
-    border-top: 1px solid #2a2a2a;
-}
-
-.bp-row:first-child {
-    border-top: none;
-}
-
-.bp-row.expandable {
+.bp-row.expandable,
+.opt-node-row.expandable {
     cursor: pointer;
     user-select: none;
     list-style: none;
     border-top: none;
 }
 
-.bp-row.expandable::-webkit-details-marker {
+.bp-row.expandable::-webkit-details-marker,
+.opt-node-row.expandable::-webkit-details-marker {
     display: none;
 }
 
-.bp-row.expandable:hover {
+.plan-item:hover,
+.bp-row.expandable:hover,
+.opt-node-row:hover,
+.opt-table-row:hover {
     background-color: var(--surface);
 }
 
@@ -353,8 +643,22 @@
     transition: transform 0.15s ease;
 }
 
-.bp-accordion[open] .bp-chevron {
+.bp-accordion[open] > summary .bp-chevron,
+.opt-node-branch[open] > summary .bp-chevron {
     transform: rotate(90deg);
+}
+
+/* Raw Blueprints & Materials */
+.bp-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    border-top: 1px solid #2a2a2a;
+}
+
+.bp-row:first-child {
+    border-top: none;
 }
 
 .bp-icon {
@@ -381,19 +685,20 @@
     color: #999;
 }
 
-.bp-runs {
+.bp-runs,
+.buy-qty {
     font-size: 0.9rem;
     font-weight: 600;
+}
+
+.bp-runs {
     color: var(--accent);
 }
 
 .buy-qty {
-    font-size: 0.9rem;
-    font-weight: 600;
     color: var(--warning);
 }
 
-/* Collapsible Material List */
 .material-list {
     list-style: none;
     margin: 0;
@@ -439,7 +744,172 @@
     padding: 0.4rem 0;
 }
 
-/* Scrollbars */
+/* ============================================================================
+   RECURSIVE BUY-VS-CRAFT TREE
+   ============================================================================ */
+
+.opt-node-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.85rem;
+    border-top: 1px solid #232325;
+}
+
+.opt-node-branch > .opt-node-row {
+    border-top: none;
+}
+
+.opt-node-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.opt-node-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.opt-node-name {
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: #e8e8e8;
+}
+
+.opt-node-qty {
+    font-size: 0.8rem;
+    font-family: monospace;
+    color: var(--accent);
+}
+
+.opt-meta-tag {
+    font-size: 0.72rem;
+    color: #999;
+}
+
+.opt-node-badges,
+.shop-sub-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.opt-node-costs {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    flex-shrink: 0;
+}
+
+.cost-compare {
+    font-size: 0.7rem;
+    color: #888;
+}
+
+.chosen-cost {
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: monospace;
+    color: #e0e0e0;
+}
+
+/* ============================================================================
+   TABLES & REPROCESSING BANNER
+   ============================================================================ */
+
+.opt-table-head,
+.opt-table-row {
+    display: grid;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.85rem;
+}
+
+.opt-table-head {
+    background-color: var(--bg-darker);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #999;
+    border-bottom: 1px solid #333;
+}
+
+.opt-table-row {
+    font-size: 0.84rem;
+    border-top: 1px solid #242426;
+}
+
+.opt-table-row:first-of-type {
+    border-top: none;
+}
+
+.shop-grid {
+    grid-template-columns: minmax(220px, 1fr) 110px 120px 135px;
+}
+
+.job-grid {
+    grid-template-columns: minmax(180px, 1fr) 70px 140px 95px 125px;
+}
+
+.ore-grid {
+    grid-template-columns: minmax(180px, 1fr) 120px 105px 80px 130px;
+}
+
+.min-grid {
+    grid-template-columns: minmax(180px, 1fr) 120px 120px 130px;
+}
+
+.item-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.shop-item-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.num {
+    text-align: right;
+}
+
+.reproc-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-subtle);
+}
+
+.reproc-banner.active {
+    border-color: #2f5e4b;
+    background-color: rgba(78, 201, 176, 0.08);
+}
+
+.reproc-banner > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+
 .sidebar-list::-webkit-scrollbar,
 .plan-sections::-webkit-scrollbar {
     width: 8px;

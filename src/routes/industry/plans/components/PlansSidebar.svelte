@@ -8,7 +8,7 @@
         openCreatePlan,
         selectPlan,
         selectedPlanId
-    } from './plans';
+    } from '../plans';
 </script>
 
 <aside class="plans-sidebar">

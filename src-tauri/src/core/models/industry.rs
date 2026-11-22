@@ -86,30 +86,6 @@ pub struct IndustryPlan {
 
 // --- CCP SDE Deserialization Models ---
 
-#[derive(Deserialize, Debug)]
-pub struct SdeMaterial {
-    #[serde(rename = "typeID")]
-    pub type_id: u32,
-    pub quantity: u64,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct SdeActivity {
-    #[serde(default)]
-    pub materials: Vec<SdeMaterial>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct SdeActivities {
-    pub manufacturing: Option<SdeActivity>,
-    pub reaction: Option<SdeActivity>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct SdeBlueprint {
-    pub activities: SdeActivities,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum SecurityStatus {
@@ -148,9 +124,11 @@ pub struct IndustryStructure {
     pub rigs: Vec<String>,
     #[serde(default)]
     pub services: Vec<String>,
+    #[serde(default)]
+    pub location_id: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PriceProvider {
     #[default]
