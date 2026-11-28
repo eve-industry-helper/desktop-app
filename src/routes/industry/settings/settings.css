@@ -86,6 +86,10 @@
     color: #9cdcfe;
 }
 
+.implant-field {
+    max-width: 380px;
+}
+
 .skill-groups {
     display: flex;
     flex-direction: column;

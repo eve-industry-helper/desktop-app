@@ -312,9 +312,11 @@ pub fn blueprint_job_cost(
     eiv * (sci * struct_cost_mult + tax + SCC_SURCHARGE)
 }
 
-/// Maps an Asteroid ore `group_id` to its EVE Ore Processing Skill ID.
+/// Maps an Asteroid/Moon ore or Ice `group_id` to its EVE Processing Skill ID.
 pub fn ore_processing_skill_id(group_id: u32) -> Option<u32> {
     match group_id {
+        // Ice Processing (18025)
+        465 => Some(18025),
         // Simple Ore Processing (60377): Veldspar, Scordite, Pyroxeres, Plagioclase
         462 | 460 | 459 | 458 => Some(60377),
         // Coherent Ore Processing (60378): Omber, Kernite, Jaspet, Hemorphite, Hedbergite
@@ -337,43 +339,78 @@ pub fn ore_processing_skill_id(group_id: u32) -> Option<u32> {
     }
 }
 
-/// Computes exact reprocessing yield (0.0..1.0) for an asteroid/moon ore at `structure`.
+/// Computes exact reprocessing yield (0.0..=1.0) for an asteroid/moon ore or ice at `structure`:
+/// `((50 + Rm) / 100 * (1 + Sec)) * (1 + Sm) * (1 + 0.03 * R) * (1 + 0.02 * Re) * (1 + 0.02 * Op) * (1 + Im)`
+/// where `Sec` only applies when a matching reprocessing rig (`Rm > 0`) is fitted.
 pub fn asteroid_reprocessing_yield(
     group_id: u32,
     structure: Option<&IndustryStructure>,
     skills: &HashMap<u32, u8>,
+    implant_bonus: f64,
 ) -> f64 {
     let is_moon = matches!(group_id, 1884 | 1920 | 1921 | 1922 | 1923);
+    let is_ice = group_id == 465;
 
-    let (rig_base, sec_mult, struct_bonus) = match structure {
+    let (rig_modifier, sec_mult, struct_bonus) = match structure {
         Some(s) if matches!(s.structure_type, StructureType::Athanor | StructureType::Tatara) => {
-            let mut best_rig_base = 0.50_f64;
+            let mut best_rm = 0.0_f64;
             for rig in &s.rigs {
-                let lower = rig.to_lowercase();
+                let lower = rig.trim().to_lowercase();
                 let applies = lower.contains("reprocessing efficiency")
                     || (is_moon && lower.contains("moon ore grading"))
-                    || (!is_moon && lower.contains("asteroid ore grading"));
+                    || (is_ice && lower.contains("ice grading"))
+                    || (!is_moon && !is_ice && lower.contains("asteroid ore grading"));
                 if applies {
-                    let base = if lower.ends_with(" ii") { 0.53 } else { 0.51 };
-                    best_rig_base = best_rig_base.max(base);
+                    let rm = if lower.ends_with(" ii") { 3.0 } else { 1.0 };
+                    best_rm = best_rm.max(rm);
                 }
             }
+            let sec_mult = if best_rm > 0.0 {
+                security_reprocessing_mult(&s.security_status)
+            } else {
+                1.0
+            };
             (
-                best_rig_base,
-                security_reprocessing_mult(&s.security_status),
+                best_rm,
+                sec_mult,
                 structure_reprocessing_role_bonus(&s.structure_type),
             )
         }
-        _ => (0.50, 1.0, 1.0),
+        _ => (0.0, 1.0, 1.0),
     };
 
-    let reproc = 1.0 + 0.03 * skill_level(skills, 3385);
-    let reproc_eff = 1.0 + 0.02 * skill_level(skills, 3389);
+    let base_with_rig = (50.0 + rig_modifier) / 100.0;
+    let reproc = 1.0 + 0.03 * skill_level(skills, 3385).min(5.0);
+    let reproc_eff = 1.0 + 0.02 * skill_level(skills, 3389).min(5.0);
     let spec = ore_processing_skill_id(group_id)
-        .map(|sid| 1.0 + 0.02 * skill_level(skills, sid))
+        .map(|sid| 1.0 + 0.02 * skill_level(skills, sid).min(5.0))
         .unwrap_or(1.0);
+    let implant_mult = 1.0 + implant_bonus.clamp(0.0, 0.04);
 
-    (rig_base * sec_mult * struct_bonus * reproc * reproc_eff * spec).min(1.0)
+    ((base_with_rig * sec_mult) * struct_bonus * reproc * reproc_eff * spec * implant_mult).min(1.0)
+}
+
+/// Computes exact reprocessing yield (0.50..=0.55) for modules, ships, and other non-ore items:
+/// `50% * (1 + Scrapmetal Processing * 0.02)`, unaffected by structures, rigs, security, or implants.
+pub fn scrapmetal_reprocessing_yield(skills: &HashMap<u32, u8>) -> f64 {
+    let lvl = skill_level(skills, 12196).min(5.0);
+    (0.50 * (1.0 + 0.02 * lvl)).min(0.55)
+}
+
+/// Computes reprocessing yield for any EVE item, dispatching ores/ice vs. modules/items (scrapmetal).
+pub fn item_reprocessing_yield(
+    category_id: u32,
+    group_id: u32,
+    structure: Option<&IndustryStructure>,
+    skills: &HashMap<u32, u8>,
+    implant_bonus: f64,
+) -> f64 {
+    const ASTEROID_CATEGORY_ID: u32 = 25;
+    if category_id == ASTEROID_CATEGORY_ID || group_id == 465 {
+        asteroid_reprocessing_yield(group_id, structure, skills, implant_bonus)
+    } else {
+        scrapmetal_reprocessing_yield(skills)
+    }
 }
 
 pub fn sales_tax_rate(skills: &HashMap<u32, u8>) -> f64 {
@@ -427,4 +464,142 @@ pub fn effective_sell_unit_revenue(
         PriceBasis::Buy | PriceBasis::Split => 0.0,
     };
     raw * (1.0 - tax - broker).max(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_structure(
+        structure_type: StructureType,
+        security_status: SecurityStatus,
+        rigs: Vec<&str>,
+    ) -> IndustryStructure {
+        IndustryStructure {
+            id: "test-struct".to_string(),
+            name: "Test Refinery".to_string(),
+            structure_type,
+            security_status,
+            manufacturing_cost_index: 0.0,
+            reaction_cost_index: 0.0,
+            facility_tax: 0.0,
+            rigs: rigs.into_iter().map(String::from).collect(),
+            services: vec!["Reprocessing".to_string()],
+            location_id: None,
+        }
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "expected {:.10}, got {:.10}",
+            expected,
+            actual
+        );
+    }
+
+    #[test]
+    fn max_nullsec_tatara_t2_with_rx804_matches_eve_formula() {
+        let tatara = make_structure(
+            StructureType::Tatara,
+            SecurityStatus::NullSec,
+            vec!["Standup L-Set Reprocessing Efficiency II"],
+        );
+        let skills = HashMap::from([(3385, 5), (3389, 5), (60377, 5)]);
+        let y = asteroid_reprocessing_yield(462, Some(&tatara), &skills, 0.04);
+        // ((50 + 3) / 100 * 1.12) * 1.055 * 1.15 * 1.10 * 1.10 * 1.04 = 0.90628105568
+        assert_close(y, 0.53 * 1.12 * 1.055 * 1.15 * 1.10 * 1.10 * 1.04);
+    }
+
+    #[test]
+    fn highsec_tatara_t2_with_rx804_matches_eve_formula() {
+        let tatara = make_structure(
+            StructureType::Tatara,
+            SecurityStatus::HighSec,
+            vec!["Standup L-Set Reprocessing Efficiency II"],
+        );
+        let skills = HashMap::from([(3385, 5), (3389, 5), (60377, 5)]);
+        let y = asteroid_reprocessing_yield(462, Some(&tatara), &skills, 0.04);
+        assert_close(y, 0.53 * 1.00 * 1.055 * 1.15 * 1.10 * 1.10 * 1.04);
+    }
+
+    #[test]
+    fn unrigged_refineries_do_not_receive_security_bonus() {
+        let skills = HashMap::new();
+
+        let athanor = make_structure(StructureType::Athanor, SecurityStatus::NullSec, vec![]);
+        assert_close(asteroid_reprocessing_yield(462, Some(&athanor), &skills, 0.0), 0.50 * 1.02);
+
+        let tatara = make_structure(StructureType::Tatara, SecurityStatus::Wormhole, vec![]);
+        assert_close(asteroid_reprocessing_yield(462, Some(&tatara), &skills, 0.0), 0.50 * 1.055);
+    }
+
+    #[test]
+    fn lowsec_t1_athanor_and_non_matching_rig_behavior() {
+        let skills = HashMap::new();
+
+        let athanor_matching = make_structure(
+            StructureType::Athanor,
+            SecurityStatus::LowSec,
+            vec!["Standup M-Set Asteroid Ore Grading Processor I"],
+        );
+        assert_close(
+            asteroid_reprocessing_yield(462, Some(&athanor_matching), &skills, 0.0),
+            0.51 * 1.06 * 1.02,
+        );
+
+        // Moon rig does not apply to asteroid ore -> Rm = 0, Sec = 0
+        let athanor_moon_only = make_structure(
+            StructureType::Athanor,
+            SecurityStatus::NullSec,
+            vec!["Standup M-Set Moon Ore Grading Processor II"],
+        );
+        assert_close(
+            asteroid_reprocessing_yield(462, Some(&athanor_moon_only), &skills, 0.0),
+            0.50 * 1.02,
+        );
+    }
+
+    #[test]
+    fn other_upwell_and_npc_have_zero_structure_modifier() {
+        let fortizar = make_structure(StructureType::Fortizar, SecurityStatus::NullSec, vec![]);
+        let skills = HashMap::from([(3385, 5), (3389, 5), (60377, 5)]);
+        let expected = 0.50 * 1.15 * 1.10 * 1.10 * 1.02;
+
+        assert_close(asteroid_reprocessing_yield(462, Some(&fortizar), &skills, 0.02), expected);
+        assert_close(asteroid_reprocessing_yield(462, None, &skills, 0.02), expected);
+    }
+
+    #[test]
+    fn ice_processing_uses_ice_rig_and_skill() {
+        let athanor = make_structure(
+            StructureType::Athanor,
+            SecurityStatus::Wormhole,
+            vec!["Standup M-Set Ice Grading Processor II"],
+        );
+        let skills = HashMap::from([(3385, 5), (3389, 5), (18025, 5)]);
+        let y = item_reprocessing_yield(25, 465, Some(&athanor), &skills, 0.04);
+        assert_close(y, 0.53 * 1.12 * 1.02 * 1.15 * 1.10 * 1.10 * 1.04);
+    }
+
+    #[test]
+    fn scrapmetal_formula_ignores_structure_rig_sec_and_implant_and_caps_at_55_percent() {
+        let tatara = make_structure(
+            StructureType::Tatara,
+            SecurityStatus::NullSec,
+            vec!["Standup L-Set Reprocessing Efficiency II"],
+        );
+
+        let lvl0 = HashMap::new();
+        assert_close(scrapmetal_reprocessing_yield(&lvl0), 0.50);
+        assert_close(item_reprocessing_yield(7, 53, Some(&tatara), &lvl0, 0.04), 0.50);
+
+        let lvl3 = HashMap::from([(12196, 3), (3385, 5), (3389, 5)]);
+        assert_close(scrapmetal_reprocessing_yield(&lvl3), 0.53);
+        assert_close(item_reprocessing_yield(7, 53, Some(&tatara), &lvl3, 0.04), 0.53);
+
+        let lvl5 = HashMap::from([(12196, 5), (3385, 5), (3389, 5)]);
+        assert_close(scrapmetal_reprocessing_yield(&lvl5), 0.55);
+        assert_close(item_reprocessing_yield(7, 53, Some(&tatara), &lvl5, 0.04), 0.55);
+    }
 }

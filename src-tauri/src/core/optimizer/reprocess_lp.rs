@@ -6,10 +6,10 @@ use crate::core::models::industry::{IndustryStructure, PriceBasis};
 use crate::core::models::market::MarketPrice;
 use crate::core::models::sde::SdeIndex;
 use crate::core::optimizer::bonuses::{
-    asteroid_reprocessing_yield,
     effective_buy_unit_price,
     effective_sell_unit_revenue,
     is_base_mineral,
+    item_reprocessing_yield,
 };
 
 const ASTEROID_CATEGORY_ID: u32 = 25;
@@ -118,6 +118,7 @@ pub struct ReprocessInput<'a> {
     pub product_basis: &'a PriceBasis,
     pub structure: Option<&'a IndustryStructure>,
     pub skills: &'a HashMap<u32, u8>,
+    pub reprocessing_implant_bonus: f64,
     pub credit_surplus: bool,
 }
 
@@ -193,7 +194,19 @@ pub fn solve_mineral_reprocessing(input: &ReprocessInput<'_>) -> ReprocessingPla
             continue;
         }
 
-        let yield_rate = asteroid_reprocessing_yield(info.group_id, input.structure, input.skills);
+        let category_id = input
+            .sde
+            .groups
+            .get(&info.group_id)
+            .map(|g| g.category_id)
+            .unwrap_or(ASTEROID_CATEGORY_ID);
+        let yield_rate = item_reprocessing_yield(
+            category_id,
+            info.group_id,
+            input.structure,
+            input.skills,
+            input.reprocessing_implant_bonus,
+        );
         let yields_per_batch: Vec<(u32, u64)> = reproc_mats
             .iter()
             .filter_map(|m| {

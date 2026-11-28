@@ -6,9 +6,17 @@
         groupedIndustrySkills,
         isFetchingSkills,
         lastSyncedCharacter,
+        REPROCESSING_IMPLANTS,
+        reprocessingImplantBonus,
+        setReprocessingImplant,
         settingsError
     } from '#lib/stores/industrySettings';
     import { formatSkillBonus } from '../settings';
+
+    function handleImplantChange(event: Event) {
+        const val = Number((event.currentTarget as HTMLSelectElement).value);
+        setReprocessingImplant(val);
+    }
 </script>
 
 <div class="settings-card">
@@ -44,7 +52,22 @@
         <span>Sci Slots: <strong>{$computedModifiers.maxScienceSlots}</strong></span>
         <span>Mfg Time: <strong>{($computedModifiers.manufacturingTimeMultiplier * 100).toFixed(1)}%</strong></span>
         <span>Rxn Time: <strong>{($computedModifiers.reactionTimeMultiplier * 100).toFixed(1)}%</strong></span>
+        <span>Scrapmetal Yield: <strong>{(50 * $computedModifiers.scrapmetalYieldMultiplier).toFixed(1)}%</strong></span>
     </div>
+
+    <label class="field-label implant-field">
+        <span>Reprocessing Implant (Slot 8)</span>
+        <select
+                class="text-input"
+                value={$reprocessingImplantBonus}
+                disabled={!$activeCharacterId}
+                on:change={handleImplantChange}
+        >
+            {#each REPROCESSING_IMPLANTS as imp (imp.bonus)}
+                <option value={imp.bonus}>{imp.label}</option>
+            {/each}
+        </select>
+    </label>
 
     <div class="skill-groups">
         {#each $groupedIndustrySkills as section (section.group)}

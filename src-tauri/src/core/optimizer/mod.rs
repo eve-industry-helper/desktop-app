@@ -170,11 +170,15 @@ pub async fn run_optimizer(
     let saved_plans: Vec<IndustryPlan> = read_json_or_default(app, PLANS_FILE).unwrap_or_default();
     let mut warnings = Vec::new();
 
-    let skills: HashMap<u32, u8> = req
+    let character_skill_cache = req
         .character_id
-        .and_then(|cid| settings.character_skills.get(&cid))
+        .and_then(|cid| settings.character_skills.get(&cid));
+    let skills: HashMap<u32, u8> = character_skill_cache
         .map(|c| c.skills.clone())
         .unwrap_or_default();
+    let reprocessing_implant_bonus = character_skill_cache
+        .map(|c| c.reprocessing_implant_bonus)
+        .unwrap_or(0.0);
 
     let reprocessing_enabled = match req.scope {
         OptimizeScope::Entry => req
@@ -522,6 +526,7 @@ pub async fn run_optimizer(
             product_basis: &pricing.product_price_basis,
             structure: reprocessing_structure,
             skills: &skills,
+            reprocessing_implant_bonus,
             credit_surplus,
         });
         Some(lp_plan)

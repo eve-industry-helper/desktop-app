@@ -20,6 +20,8 @@ pub struct CharacterSkillCache {
     pub character_name: String,
     #[serde(default)]
     pub skills: HashMap<u32, u8>,
+    #[serde(default)]
+    pub reprocessing_implant_bonus: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
