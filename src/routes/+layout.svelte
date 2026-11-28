@@ -40,32 +40,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    .app-layout {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        width: 100vw;
-        overflow: hidden;
-    }
-
-    .page-content {
-        flex-grow: 1;
-        overflow-y: auto;
-        position: relative;
-    }
-
-    .main-workspace {
-        display: flex;
-        flex-grow: 1;
-        overflow: hidden;
-    }
-
-    .right-column {
-        display: flex;
-        flex-direction: column;
-        flex-grow: 1;
-        min-width: 0;
-    }
-</style>

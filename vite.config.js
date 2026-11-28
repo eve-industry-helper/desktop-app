@@ -26,6 +26,9 @@ export default defineConfig(() => ({
     port: 1420,
     strictPort: true,
     host: host || "127.0.0.1",
+    headers: {
+      "Cache-Control": "no-store",
+    },
     hmr: host
       ? {
           protocol: "ws",
