@@ -31,11 +31,31 @@ export const industrySettings = writable<IndustrySettings>({
 export const isFetchingSkills = writable<boolean>(false);
 export const settingsError = writable<string>('');
 
+export interface ReprocessingImplantOption {
+    bonus: number;
+    label: string;
+}
+
+export const REPROCESSING_IMPLANTS: ReprocessingImplantOption[] = [
+    { bonus: 0,    label: 'None (0%)' },
+    { bonus: 0.01, label: "Zainou 'Beancounter' Reprocessing RX-801 (+1%)" },
+    { bonus: 0.02, label: "Zainou 'Beancounter' Reprocessing RX-802 (+2%)" },
+    { bonus: 0.04, label: "Zainou 'Beancounter' Reprocessing RX-804 (+4%)" }
+];
+
 export const characterSkillLevels = derived(
     [industrySettings, activeCharacterId],
     ([$settings, $charId]): Record<number, number> => {
         if (!$charId) return {};
         return $settings.characterSkills[$charId]?.skills ?? {};
+    }
+);
+
+export const reprocessingImplantBonus = derived(
+    [industrySettings, activeCharacterId],
+    ([$settings, $charId]): number => {
+        if (!$charId) return 0;
+        return $settings.characterSkills[$charId]?.reprocessingImplantBonus ?? 0;
     }
 );
 
@@ -146,13 +166,15 @@ export async function fetchCharacterSkills() {
 
         let updatedSettings: IndustrySettings = get(industrySettings);
         industrySettings.update(current => {
+            const existing = current.characterSkills[charId];
             updatedSettings = {
                 ...current,
                 characterSkills: {
                     ...current.characterSkills,
                     [charId]: {
                         characterName,
-                        skills: levelMap
+                        skills: levelMap,
+                        reprocessingImplantBonus: existing?.reprocessingImplantBonus ?? 0
                     }
                 }
             };
@@ -166,6 +188,35 @@ export async function fetchCharacterSkills() {
     } finally {
         isFetchingSkills.set(false);
     }
+}
+
+export async function setReprocessingImplant(bonus: number) {
+    settingsError.set('');
+    const charId = get(activeCharacterId);
+    if (!charId) return;
+
+    const clamped = Math.max(0, Math.min(0.04, Number(bonus) || 0));
+    const profile = get(characters).find(c => c.character_id === charId);
+    const fallbackName = profile?.character_name ?? `Character ${charId}`;
+
+    let updatedSettings: IndustrySettings = get(industrySettings);
+    industrySettings.update(current => {
+        const existing = current.characterSkills[charId];
+        updatedSettings = {
+            ...current,
+            characterSkills: {
+                ...current.characterSkills,
+                [charId]: {
+                    characterName: existing?.characterName ?? fallbackName,
+                    skills: existing?.skills ?? {},
+                    reprocessingImplantBonus: clamped
+                }
+            }
+        };
+        return updatedSettings;
+    });
+
+    await persistIndustrySettings(updatedSettings);
 }
 
 export async function saveStructure(structure: IndustryStructure) {

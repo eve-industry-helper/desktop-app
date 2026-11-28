@@ -118,6 +118,7 @@ export interface ComputedIndustryModifiers {
 export interface CharacterSkillCache {
     characterName: string;
     skills: Record<number, number>;
+    reprocessingImplantBonus?: number;
 }
 
 export type SecurityStatus = 'highsec' | 'lowsec' | 'nullsec' | 'wormhole';
