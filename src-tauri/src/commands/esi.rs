@@ -1,3 +1,4 @@
+use std::time::{SystemTime, UNIX_EPOCH};
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use reqwest::Response;
 use serde::de::DeserializeOwned;
@@ -16,7 +17,7 @@ use crate::core::models::eve::{
     UniverseIdsResponse,
     UniverseName,
 };
-use crate::core::state::AppState;
+use crate::core::state::{AppState, CachedAssets};
 
 pub(crate) async fn parse_esi_response<T: DeserializeOwned>(res: Response) -> Result<T, String> {
     if res.status().is_success() {
@@ -146,7 +147,22 @@ pub async fn get_character_assets(
         "https://esi.evetech.net/latest/characters/{}/assets/",
         character_id
     );
-    esi_get_authed(&app, &state, character_id, &url).await
+    let assets: Vec<Asset> = esi_get_authed(&app, &state, character_id, &url).await?;
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut cache = state.assets_cache.lock().await;
+    cache.insert(
+        character_id,
+        CachedAssets {
+            updated_at: now,
+            assets: assets.clone(),
+        },
+    );
+
+    Ok(assets)
 }
 
 #[tauri::command]

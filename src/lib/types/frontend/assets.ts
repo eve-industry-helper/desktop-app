@@ -1,4 +1,4 @@
-import type { Asset } from '../backend/esi';
+import type { Asset, Blueprint } from '../backend/esi';
 
 export interface AssetNode extends Asset {
     children: AssetNode[];
@@ -9,4 +9,12 @@ export interface LocationGroup {
     name: string;
     items: AssetNode[];
     totalStacks: number;
+}
+
+export interface SelectedBlueprintAsset {
+    node: AssetNode;
+    locationId: number;
+    locationName: string;
+    blueprintName: string;
+    blueprintInfo: Blueprint | null;
 }

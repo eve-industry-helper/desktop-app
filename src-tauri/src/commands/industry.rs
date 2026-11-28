@@ -1,9 +1,13 @@
 use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
 use crate::core::models::industry::{IndustryPlan, IndustrySettings, PlanEntryKind, RawMaterial};
-use crate::core::models::sde::BlueprintActivity;
+use crate::core::models::sde::{BlueprintActivity, BlueprintSearchMatch};
+use crate::core::optimizer::preview::{
+    run_blueprint_preview,
+    BlueprintPreviewRequest,
+    BlueprintPreviewResult,
+};
 use crate::core::optimizer::stock::{list_asset_locations, AssetLocationOption};
 use crate::core::optimizer::{run_optimizer, OptimizationResult, OptimizePlanRequest};
 use crate::core::state::AppState;
@@ -11,16 +15,6 @@ use crate::core::storage::{read_json_or_default, write_json_atomic};
 
 const SETTINGS_FILE: &str = "industry_settings.json";
 const PLANS_FILE: &str = "plans.json";
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct BlueprintSearchMatch {
-    pub blueprint_type_id: u32,
-    pub blueprint_name: String,
-    pub product_type_id: u32,
-    pub product_name: String,
-    pub activity: BlueprintActivity,
-}
 
 #[tauri::command]
 pub fn save_industry_settings(app: AppHandle, settings: IndustrySettings) -> Result<(), String> {
@@ -161,6 +155,35 @@ pub async fn optimize_plan(
     request: OptimizePlanRequest,
 ) -> Result<OptimizationResult, String> {
     run_optimizer(&app, &state, request).await
+}
+
+#[tauri::command]
+pub async fn filter_sde_blueprints(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    type_ids: Vec<u32>,
+) -> Result<Vec<u32>, String> {
+    if type_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let sde = crate::core::sde_service::ensure_sde_loaded(&app, &state).await?;
+    let mut matched: Vec<u32> = type_ids
+        .into_iter()
+        .filter(|id| sde.blueprints.contains_key(id))
+        .collect();
+    matched.sort_unstable();
+    matched.dedup();
+    Ok(matched)
+}
+
+#[tauri::command]
+pub async fn preview_blueprint_craft(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    request: BlueprintPreviewRequest,
+) -> Result<BlueprintPreviewResult, String> {
+    run_blueprint_preview(&app, &state, request).await
 }
 
 #[tauri::command]
