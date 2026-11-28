@@ -2,25 +2,33 @@ import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { parseEftFit } from '#lib/utils/eftParser';
 import { structuresList } from '#lib/stores/industrySettings';
+import {
+    industryPlans,
+    ensureBuildConfig,
+    pickInitialStructures,
+    loadPlans as loadSharedPlans,
+    persistPlans as persistSharedPlans,
+    attachMaterials,
+    createPlanByName,
+    addBlueprintToPlan
+} from '#lib/stores/plans';
 import type {
     UniverseIdMatch,
-    UniverseName,
     BlueprintSearchMatch
 } from '#lib/types/backend';
 import type {
     BuildConfig,
     IndustryPlan,
-    IndustryStructure,
     PlanBlueprint,
     PlanBuyItem,
     PlanEntry,
     PlanEntryKind,
-    RawMaterial,
     ReservedResource,
 } from '#lib/types/frontend';
 
+export { industryPlans, ensureBuildConfig, createPlanByName, addBlueprintToPlan };
+
 // Core state
-export const industryPlans = writable<IndustryPlan[]>([]);
 export const selectedPlanId = writable<string | null>(null);
 export const selectedEntryId = writable<string | null>(null);
 export const validationVersion = writable<number>(0);
@@ -52,74 +60,12 @@ export const selectedEntry = derived(
     ([$plan,$entryId]) => $plan?.entries.find(e => e.id === $entryId) ?? null
 );
 
-function pickInitialStructures(structures: IndustryStructure[]) {
-    const mfg =
-        structures.find(s => s.services.includes('Manufacturing')) ??
-        structures.find(s => ['sotiyo', 'azbel', 'raitaru'].includes(s.structureType)) ??
-        structures[0];
-
-    const refinery =
-        structures.find(s => s.services.includes('Reprocessing') || s.services.includes('Reactions')) ??
-        structures.find(s => ['tatara', 'athanor'].includes(s.structureType));
-
-    return {
-        manufacturingStructureId: mfg?.id ?? null,
-        reactionStructureId: refinery?.id ?? null,
-        reprocessingStructureId: refinery?.id ?? null
-    };
-}
-
-export function ensureBuildConfig(cfg?: Partial<BuildConfig> | null): BuildConfig {
-    return {
-        manufacturingStructureId: cfg?.manufacturingStructureId ?? null,
-        reactionStructureId: cfg?.reactionStructureId ?? null,
-        reprocessingStructureId: cfg?.reprocessingStructureId ?? null,
-        defaultMe: cfg?.defaultMe ?? 10,
-        defaultTe: cfg?.defaultTe ?? 20,
-        quantity: Math.max(1, Math.floor(Number(cfg?.quantity) || 1)),
-        useCharacterAssets: cfg?.useCharacterAssets ?? true,
-        enableReprocessingLp: cfg?.enableReprocessingLp ?? true,
-        creditSurplusMinerals: cfg?.creditSurplusMinerals ?? false,
-        overrides: cfg?.overrides ? { ...cfg.overrides } : {}
-    };
-}
-
-function normalizePlan(plan: IndustryPlan): IndustryPlan {
-    return {
-        ...plan,
-        config: ensureBuildConfig(plan.config),
-        validated: Boolean(plan.validated),
-        validatedAt: plan.validatedAt ?? null,
-        reservedResources: Array.isArray(plan.reservedResources) ? plan.reservedResources : [],
-        entries: (plan.entries ?? []).map(entry => ({
-            ...entry,
-            config: ensureBuildConfig(entry.config)
-        }))
-    };
-}
-
-let hasLoadedPlans = false;
-
 export async function loadPlans() {
-    if (hasLoadedPlans) return;
-
-    try {
-        const saved: IndustryPlan[] = await invoke('load_plans');
-        industryPlans.set(saved.map(normalizePlan));
-        hasLoadedPlans = true;
-    } catch (error) {
-        console.error('Failed to load plans:', error);
-        industryError.set(`Failed to load saved plans: ${error}`);
-    }
+    await loadSharedPlans(msg => industryError.set(msg));
 }
 
 async function persistPlans(plans: IndustryPlan[]) {
-    try {
-        await invoke('save_plans', { plans });
-    } catch (error) {
-        console.error('Failed to save plans:', error);
-        industryError.set(`Failed to save plans: ${error}`);
-    }
+    await persistSharedPlans(plans, msg => industryError.set(msg));
 }
 
 // --- Plan & Entry Config Persistence ---
@@ -378,40 +324,6 @@ export async function removeEntry(entryId: string) {
 }
 
 // --- Resolution Helpers ---
-
-async function attachMaterials(blueprints: PlanBlueprint[]): Promise<void> {
-    if (blueprints.length === 0) return;
-
-    const bpIds = blueprints.map(bp => bp.blueprintTypeId);
-    const rawMaterialsByBp: Record<number, RawMaterial[]> = await invoke(
-        'get_blueprint_materials',
-        { blueprintIds: bpIds }
-    );
-
-    const materialIds = new Set<number>();
-    Object.values(rawMaterialsByBp).forEach(list => {
-        list.forEach(m => materialIds.add(m.materialTypeId));
-    });
-
-    const matNames = new Map<number, string>();
-    const matIdArray = Array.from(materialIds);
-    for (let i = 0; i < matIdArray.length; i += 1000) {
-        const chunk = matIdArray.slice(i, i + 1000);
-        const resolvedMats: UniverseName[] = await invoke('resolve_eve_names', { ids: chunk });
-        resolvedMats.forEach(n => matNames.set(n.id, n.name));
-    }
-
-    for (const bp of blueprints) {
-        const rawList = rawMaterialsByBp[bp.blueprintTypeId] ?? [];
-        bp.materials = rawList
-            .map(m => ({
-                typeId: m.materialTypeId,
-                name: matNames.get(m.materialTypeId) ?? `Type ID: ${m.materialTypeId}`,
-                quantity: m.quantity * bp.runs
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }
-}
 
 async function appendEntryToSelectedPlan(entry: Omit<PlanEntry, 'config'>) {
     const plan = get(selectedPlan);

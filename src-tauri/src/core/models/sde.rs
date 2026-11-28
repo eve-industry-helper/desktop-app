@@ -12,6 +12,16 @@ pub enum BlueprintActivity {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct BlueprintSearchMatch {
+    pub blueprint_type_id: u32,
+    pub blueprint_name: String,
+    pub product_type_id: u32,
+    pub product_name: String,
+    pub activity: BlueprintActivity,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct SdeBlueprintEntry {
     pub blueprint_type_id: u32,
     pub activity: BlueprintActivity,

@@ -1,6 +1,7 @@
 pub mod bonuses;
 pub mod dag;
 pub mod job_queue;
+pub mod preview;
 pub mod reprocess_lp;
 pub mod stock;
 

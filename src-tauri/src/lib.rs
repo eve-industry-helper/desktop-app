@@ -15,11 +15,13 @@ use crate::commands::esi::{
 };
 use crate::commands::industry::{
     export_structure_json,
+    filter_sde_blueprints,
     get_blueprint_materials,
     list_character_asset_locations,
     load_industry_settings,
     load_plans,
     optimize_plan,
+    preview_blueprint_craft,
     save_industry_settings,
     save_plans,
     search_sde_blueprints,
@@ -56,6 +58,8 @@ pub fn run() {
             sync_sde,
             get_sde_status,
             optimize_plan,
+            filter_sde_blueprints,
+            preview_blueprint_craft,
             list_character_asset_locations,
             export_structure_json
         ])

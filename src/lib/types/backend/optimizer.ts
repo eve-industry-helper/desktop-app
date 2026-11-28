@@ -4,6 +4,7 @@ import type {
     PlanEntry,
     ReservedResource
 } from '#lib/types/frontend';
+import type { Blueprint } from './esi';
 
 export type { DecisionOverride };
 export type OptimizeScope = 'entry' | 'plan';
@@ -148,4 +149,58 @@ export interface BlueprintSearchMatch {
     productTypeId: number;
     productName: string;
     activity: BlueprintActivity;
+}
+
+export type PreviewNodeStatus = 'instock' | 'craftable' | 'partial' | 'missing';
+
+export interface BlueprintPreviewRequest {
+    characterId: number | null;
+    blueprint: Blueprint;
+    locationName?: string | null;
+    ownedBpMe: Record<number, number>;
+    includeAllLocations: boolean;
+    forceAssetRefresh: boolean;
+}
+
+export interface PreviewMaterialNode {
+    typeId: number;
+    name: string;
+    requiredQty: number;
+    availableQty: number;
+    missingQty: number;
+    status: PreviewNodeStatus;
+    isCraftable: boolean;
+    activity: BlueprintActivity | null;
+    blueprintTypeId: number | null;
+    runs: number;
+    outputQty: number;
+    meLevel: number;
+    haulableStock: HaulableStockEntry[];
+    children: PreviewMaterialNode[];
+}
+
+export interface PreviewSummaryItem {
+    typeId: number;
+    name: string;
+    requiredQty: number;
+    availableQty: number;
+    missingQty: number;
+    haulableStock: HaulableStockEntry[];
+}
+
+export interface BlueprintPreviewResult {
+    blueprint: Blueprint;
+    info: BlueprintSearchMatch;
+    outputQty: number;
+    jobDurationSecs: number;
+    locationName: string;
+    matchedStructureName: string | null;
+    includeAllLocations: boolean;
+    canCraftAll: boolean;
+    hasSubCrafts: boolean;
+    materials: PreviewMaterialNode[];
+    missingSummary: PreviewSummaryItem[];
+    availableSummary: PreviewSummaryItem[];
+    reservedByPlansCount: number;
+    warnings: string[];
 }
