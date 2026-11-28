@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { DecisionOverride, OptimizedNode } from '#lib/types/backend';
+    import { accordionOpenState, syncAccordionToggle } from '#lib/stores/accordionState';
     import OptimizerTreeNode from './OptimizerTreeNode.svelte';
     import {
         activeOverrides,
@@ -11,7 +12,9 @@
 
     export let node: OptimizedNode;
     export let depth = 0;
+    export let nodePath: string;
 
+    $: isOpen = $accordionOpenState[nodePath] ?? (depth < 1);
     $: activeOverride = ($activeOverrides[node.typeId] ?? 'auto') as DecisionOverride;
     $: totalHaulable = node.haulableStock.reduce((sum, h) => sum + h.quantity, 0);
     $: haulableTooltip = node.haulableStock
@@ -33,7 +36,11 @@
 </script>
 
 {#if node.children.length > 0}
-    <details class="opt-node-branch" open={depth < 1}>
+    <details
+            class="opt-node-branch"
+            open={isOpen}
+            on:toggle={(e) => syncAccordionToggle(e, nodePath, isOpen)}
+    >
         <summary class="opt-node-row expandable" style={`padding-left: ${0.75 + depth * 1.15}rem`}>
             <img src="/icon-chevron.svg" alt="" class="bp-chevron" />
             <img
@@ -93,7 +100,11 @@
 
         <div class="opt-children">
             {#each node.children as child (child.typeId)}
-                <OptimizerTreeNode node={child} depth={depth + 1} />
+                <OptimizerTreeNode
+                        node={child}
+                        depth={depth + 1}
+                        nodePath={`${nodePath}/${child.typeId}`}
+                />
             {/each}
         </div>
     </details>

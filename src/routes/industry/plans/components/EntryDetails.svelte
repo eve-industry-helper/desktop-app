@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { BuildConfig, IndustryPlan, PlanEntry } from '#lib/types/frontend';
+    import { accordionOpenState, syncAccordionToggle } from '#lib/stores/accordionState';
     import { structuresList } from '#lib/stores/industrySettings';
     import { ensureBuildConfig, removeEntry, validationVersion } from '../plans';
     import {
@@ -62,6 +63,7 @@
     $: reservedList = plan.reservedResources ?? [];
     $: overrideCount = Object.keys($activeOverrides).length;
 
+    $: treeContextKey = `${$optimizeScope}:${plan.id}:${$optimizeScope === 'plan' ? 'plan' : entry.id}`;
     $: triggerKey = `${$optimizeScope}:${plan.id}:${$optimizeScope === 'plan' ? plan.entries.length : entry.id}:${$validationVersion}`;
     $: if (triggerKey !== lastTriggerKey) {
         lastTriggerKey = triggerKey;
@@ -243,7 +245,13 @@
         </div>
 
         {#if reservedList.length > 0}
-            <details class="reserved-details">
+            {@const reservedKey = `${plan.id}::reserved`}
+            {@const reservedOpen = $accordionOpenState[reservedKey] ?? false}
+            <details
+                    class="reserved-details"
+                    open={reservedOpen}
+                    on:toggle={(e) => syncAccordionToggle(e, reservedKey, reservedOpen)}
+            >
                 <summary>View reserved hangar resources ({reservedList.length})</summary>
                 <div class="reserved-chips">
                     {#each reservedList as r (r.locationId + ':' + r.typeId)}
@@ -498,8 +506,14 @@
                     {entry.kind === 'reaction' ? 'Reaction Formula' : 'Blueprints Required'}
                 </h3>
                 <div class="bp-list">
-                    {#each entry.blueprints as bp (bp.itemTypeId)}
-                        <details class="bp-accordion" open={entry.kind !== 'fit'}>
+                    {#each entry.blueprints as bp, bpIdx (bp.itemTypeId)}
+                        {@const bpKey = `${treeContextKey}::bp::${bpIdx}:${bp.itemTypeId}`}
+                        {@const bpOpen = $accordionOpenState[bpKey] ?? (entry.kind !== 'fit')}
+                        <details
+                                class="bp-accordion"
+                                open={bpOpen}
+                                on:toggle={(e) => syncAccordionToggle(e, bpKey, bpOpen)}
+                        >
                             <summary class="bp-row expandable">
                                 <img src="/icon-chevron.svg" alt="" class="bp-chevron" />
                                 <img
@@ -578,8 +592,12 @@
             </div>
 
             <div class="opt-tree-box">
-                {#each optResult.nodes as node (node.typeId + ':' + (node.blueprintTypeId ?? 0))}
-                    <OptimizerTreeNode {node} depth={0} />
+                {#each optResult.nodes as node, idx (`${idx}:${node.typeId}:${node.blueprintTypeId ?? 0}`)}
+                    <OptimizerTreeNode
+                            {node}
+                            depth={0}
+                            nodePath={`${treeContextKey}::tree::${idx}:${node.typeId}:${node.blueprintTypeId ?? 0}`}
+                    />
                 {:else}
                     <p class="sidebar-empty">Nothing to optimize in this selection.</p>
                 {/each}

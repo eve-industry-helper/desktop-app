@@ -14,16 +14,3 @@
     {/if}
   </div>
 </main>
-
-<style>
-  .loading-text {
-    color: #888;
-    font-size: 1.1rem;
-    animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-    0% { opacity: 0.5; }
-    50% { opacity: 1; }
-    100% { opacity: 0.5; }
-  }
-</style>
